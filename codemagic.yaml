@@ -42,6 +42,8 @@ workflows:
     max_build_duration: 60
     environment:
       flutter: stable
+      groups:
+        - keys
     triggering:
       events:
         - push
@@ -54,7 +56,7 @@ workflows:
       - *pub_get
       - *launcher_icons
       - name: Build debug APK
-        script: flutter build apk --debug
+        script: flutter build apk --debug --dart-define=GEMINI_API_KEY=$GEMINI_API_KEY --dart-define=ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
     artifacts:
       - build/app/outputs/flutter-apk/app-debug.apk
 
@@ -66,13 +68,15 @@ workflows:
     max_build_duration: 60
     environment:
       flutter: stable
+      groups:
+        - keys
     scripts:
       - *create_platforms
       - *android_tweaks
       - *pub_get
       - *launcher_icons
       - name: Build release AAB
-        script: flutter build appbundle --release
+        script: flutter build appbundle --release --dart-define=GEMINI_API_KEY=$GEMINI_API_KEY --dart-define=ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
     artifacts:
       - build/app/outputs/bundle/release/*.aab
 
@@ -85,11 +89,13 @@ workflows:
     instance_type: mac_mini_m2
     environment:
       flutter: stable
+      groups:
+        - keys
     scripts:
       - *create_platforms
       - *pub_get
       - *launcher_icons
       - name: Build iOS (unsigned)
-        script: flutter build ios --release --no-codesign
+        script: flutter build ios --release --no-codesign --dart-define=GEMINI_API_KEY=$GEMINI_API_KEY --dart-define=ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
     artifacts:
       - build/ios/iphoneos/*.app
