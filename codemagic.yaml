@@ -1,0 +1,81 @@
+# ─────────────────────────────────────────────────────────────
+# NeuralCalm — cloud builds, no local Flutter needed.
+#
+# This repo ships only lib/ + pubspec.yaml. The first script of
+# every workflow runs `flutter create .` on Codemagic's machine
+# to generate the android/ and ios/ native folders, then restores
+# our pubspec. So the repo stays clean and you never run Flutter
+# on your own PC.
+# ─────────────────────────────────────────────────────────────
+
+workflows:
+
+  # 1) Runs automatically on every push to main → debug APK for your phone.
+  android-debug:
+    name: Android debug APK
+    max_build_duration: 45
+    environment:
+      flutter: stable
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+    scripts:
+      - name: Generate native platform folders
+        script: |
+          cp pubspec.yaml pubspec.keep.yaml
+          flutter create . --org com.neuralcalm --project-name neuralcalm --platforms=android,ios
+          mv -f pubspec.keep.yaml pubspec.yaml
+      - name: Get packages
+        script: flutter pub get
+      - name: Build debug APK
+        script: flutter build apk --debug
+    artifacts:
+      - build/app/outputs/flutter-apk/app-debug.apk
+
+  # 2) Start manually when we reach Play Store prep.
+  #    Before first store upload: add your keystore in
+  #    Codemagic → Code signing identities, then attach it here.
+  android-release:
+    name: Android release AAB (Play Store - manual)
+    max_build_duration: 60
+    environment:
+      flutter: stable
+    scripts:
+      - name: Generate native platform folders
+        script: |
+          cp pubspec.yaml pubspec.keep.yaml
+          flutter create . --org com.neuralcalm --project-name neuralcalm --platforms=android,ios
+          mv -f pubspec.keep.yaml pubspec.yaml
+      - name: Get packages
+        script: flutter pub get
+      - name: Build release AAB
+        script: flutter build appbundle --release
+    artifacts:
+      - build/app/outputs/bundle/release/*.aab
+
+  # 3) Start manually. Codemagic machines are Macs, so this verifies
+  #    the iOS build compiles from Windows with no Mac owned.
+  #    Real device installs / App Store need your Apple Developer
+  #    account ($99/yr) connected in Codemagic — we set that up at
+  #    store-prep time.
+  ios-verify:
+    name: iOS build check (unsigned - manual)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      flutter: stable
+    scripts:
+      - name: Generate native platform folders
+        script: |
+          cp pubspec.yaml pubspec.keep.yaml
+          flutter create . --org com.neuralcalm --project-name neuralcalm --platforms=android,ios
+          mv -f pubspec.keep.yaml pubspec.yaml
+      - name: Get packages
+        script: flutter pub get
+      - name: Build iOS (unsigned)
+        script: flutter build ios --release --no-codesign
+    artifacts:
+      - build/ios/iphoneos/*.app

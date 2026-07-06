@@ -1,0 +1,37 @@
+name: neuralcalm
+description: NeuralCalm - measure, understand, and improve your Neural Calm Score.
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  provider: ^6.1.2       # state management
+  google_fonts: ^6.2.1   # Fraunces italic + Inter (matches the website)
+  lucide_icons: ^0.257.0 # outlined icons throughout
+
+  # ── STEP 4 (real sign-in + saved score history) — uncomment then:
+  # firebase_core: ^3.6.0
+  # firebase_auth: ^5.3.1
+  # google_sign_in: ^6.2.1
+  # sign_in_with_apple: ^6.1.2
+  # cloud_firestore: ^5.4.4
+
+  # ── STEP 5 (device health data) — one API for BOTH
+  #    Apple HealthKit and Google Health Connect:
+  # health: ^11.1.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+# NOTE for store release: google_fonts downloads fonts at runtime during
+# development. Before shipping, bundle the Fraunces/Inter font files as
+# assets so the app renders correctly offline on first launch.
