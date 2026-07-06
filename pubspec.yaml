@@ -11,7 +11,7 @@ dependencies:
     sdk: flutter
   provider: ^6.1.2       # state management
   google_fonts: ^6.2.1   # Fraunces italic + Inter (matches the website)
-  lucide_icons: ^0.257.0 # outlined icons throughout
+  lucide_icons_flutter: ^3.1.14 # outlined icons (maintained; old lucide_icons breaks on modern Flutter)
 
   # ── STEP 4 (real sign-in + saved score history) — uncomment then:
   # firebase_core: ^3.6.0

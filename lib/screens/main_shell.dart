@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
 import 'assessment/assessment_intro_screen.dart';
 import 'body_screen.dart';
@@ -41,7 +41,7 @@ class _MainShellState extends State<MainShell> {
         unselectedFontSize: 12,
         items: const [
           BottomNavigationBarItem(
-              icon: Icon(LucideIcons.home), label: 'Home'),
+              icon: Icon(LucideIcons.house), label: 'Home'),
           BottomNavigationBarItem(
               icon: Icon(LucideIcons.clipboardList), label: 'Assess'),
           BottomNavigationBarItem(

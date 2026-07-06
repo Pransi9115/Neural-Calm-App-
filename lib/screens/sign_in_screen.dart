@@ -1,7 +1,7 @@
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../theme/app_colors.dart';
@@ -49,14 +49,14 @@ class SignInScreen extends StatelessWidget {
               if (isIOS)
                 PrimaryButton(
                   label: 'Continue with Apple',
-                  icon: LucideIcons.apple,
+                  icon: LucideIcons.logIn,
                   background: AppColors.ink,
                   onPressed: () => state.signInWithApple(),
                 )
               else
                 PrimaryButton(
                   label: 'Continue with Google',
-                  icon: LucideIcons.chrome,
+                  icon: LucideIcons.logIn,
                   onPressed: () => state.signInWithGoogle(),
                 ),
               const SizedBox(height: 14),
