@@ -1,7 +1,7 @@
 name: neuralcalm
 description: NeuralCalm - measure, understand, and improve your Neural Calm Score.
 publish_to: 'none'
-version: 0.1.0+1
+version: 0.2.0+2
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -9,16 +9,13 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  provider: ^6.1.2       # state management
-  google_fonts: ^6.2.1   # Fraunces italic + Inter (matches the website)
-  lucide_icons_flutter: ^3.1.14 # outlined icons (maintained; old lucide_icons breaks on modern Flutter)
-
-  # ── STEP 4 (real sign-in + saved score history) — uncomment then:
-  # firebase_core: ^3.6.0
-  # firebase_auth: ^5.3.1
-  # google_sign_in: ^6.2.1
-  # sign_in_with_apple: ^6.1.2
-  # cloud_firestore: ^5.4.4
+  provider: ^6.1.2            # state management
+  google_fonts: ^6.2.1        # Fraunces italic + Inter (matches the website)
+  lucide_icons_flutter: ^3.1.14 # outlined icons (maintained package)
+  shared_preferences: ^2.3.0  # on-device score history per account
+  http: ^1.2.0                # Marcus AI calls (Step 6)
+  firebase_core: ">=3.6.0 <5.0.0"   # Step 4 — real accounts
+  firebase_auth: ">=5.3.0 <7.0.0"   # Step 4 — email/password sign in
 
   # ── STEP 5 (device health data) — one API for BOTH
   #    Apple HealthKit and Google Health Connect:
@@ -28,9 +25,22 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  flutter_launcher_icons: ">=0.13.1 <0.15.0"  # generates the app icon
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/logo/
+    - assets/icon/
+
+# App launcher icon — generated in the cloud on every build.
+# To use your official logo as the icon: replace assets/icon/app_icon.png
+# with a 1024x1024 PNG and push.
+flutter_launcher_icons:
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assets/icon/app_icon.png"
 
 # NOTE for store release: google_fonts downloads fonts at runtime during
 # development. Before shipping, bundle the Fraunces/Inter font files as

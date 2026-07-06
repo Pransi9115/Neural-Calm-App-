@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
+import '../firebase_options.dart';
 import '../providers/app_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
@@ -11,6 +12,7 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
+    final latest = state.latestResult;
 
     return Scaffold(
       body: SafeArea(
@@ -20,11 +22,76 @@ class ProfileScreen extends StatelessWidget {
             Text('Profile',
                 style: fraunces(size: 30, color: AppColors.primaryDeep)),
             const SizedBox(height: 24),
+
+            // Account card — linked to the signed-in user.
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: const BoxDecoration(
+                      color: AppColors.lavenderSoft,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        (state.email ?? 'U')
+                            .substring(0, 1)
+                            .toUpperCase(),
+                        style: fraunces(
+                            size: 24, color: AppColors.primaryDeep),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          state.email ?? 'Local account',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w700, fontSize: 15),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          DefaultFirebaseOptions.isConfigured
+                              ? 'Signed in'
+                              : 'This device only — connect Firebase for cloud accounts',
+                          style: const TextStyle(
+                              fontSize: 12, color: AppColors.inkMuted),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
             _card(children: [
               _row(
-                icon: LucideIcons.user,
-                title: 'Account',
-                subtitle: 'Local session — real accounts in Step 4',
+                icon: LucideIcons.history,
+                title: 'Assessments taken',
+                subtitle: state.history.isEmpty
+                    ? 'None yet — take your first from the Assess tab'
+                    : '${state.history.length} saved to this account',
+              ),
+              const Divider(height: 1),
+              _row(
+                icon: LucideIcons.target,
+                title: 'Current focus area',
+                subtitle: latest == null
+                    ? 'Appears after your first assessment'
+                    : '${latest.focusArea} · score ${latest.overall.round()}',
               ),
               const Divider(height: 1),
               _row(
@@ -32,14 +99,9 @@ class ProfileScreen extends StatelessWidget {
                 title: 'Health data',
                 subtitle: 'Not connected — coming in Step 5',
               ),
-              const Divider(height: 1),
-              _row(
-                icon: LucideIcons.history,
-                title: 'Assessments taken',
-                subtitle: '${state.history.length} this session',
-              ),
             ]),
             const SizedBox(height: 16),
+
             _card(children: [
               _row(
                 icon: LucideIcons.info,

@@ -41,7 +41,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final messages = context.watch<AppState>().messages;
+    final state = context.watch<AppState>();
+    final messages = state.messages;
+    final typing = state.marcusTyping;
 
     return Scaffold(
       appBar: AppBar(
@@ -80,8 +82,41 @@ class _ChatScreenState extends State<ChatScreen> {
                   : ListView.builder(
                       controller: _scroll,
                       padding: const EdgeInsets.all(20),
-                      itemCount: messages.length,
+                      itemCount: messages.length + (typing ? 1 : 0),
                       itemBuilder: (context, i) {
+                        if (i == messages.length) {
+                          return Align(
+                            alignment: Alignment.centerLeft,
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: AppColors.surface,
+                                borderRadius: BorderRadius.circular(18),
+                                border:
+                                    Border.all(color: AppColors.border),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppColors.primary),
+                                  ),
+                                  SizedBox(width: 10),
+                                  Text('Marcus is thinking…',
+                                      style: TextStyle(
+                                          color: AppColors.inkMuted,
+                                          fontSize: 13)),
+                                ],
+                              ),
+                            ),
+                          );
+                        }
                         final m = messages[i];
                         return Align(
                           alignment: m.fromUser

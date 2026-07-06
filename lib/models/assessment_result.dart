@@ -24,4 +24,26 @@ class AssessmentResult {
     required this.usedBiometrics,
     required this.takenAt,
   });
+
+  Map<String, dynamic> toJson() => {
+        'overall': overall,
+        'categories': categories,
+        'focusArea': focusArea,
+        'insight': insight,
+        'usedBiometrics': usedBiometrics,
+        'takenAt': takenAt.toIso8601String(),
+      };
+
+  factory AssessmentResult.fromJson(Map<String, dynamic> json) {
+    return AssessmentResult(
+      overall: (json['overall'] as num).toDouble(),
+      categories: (json['categories'] as Map<String, dynamic>)
+          .map((k, v) => MapEntry(k, (v as num).toDouble())),
+      focusArea: json['focusArea'] as String,
+      insight: json['insight'] as String? ?? '',
+      usedBiometrics: json['usedBiometrics'] as bool? ?? false,
+      takenAt:
+          DateTime.tryParse(json['takenAt'] as String? ?? '') ?? DateTime.now(),
+    );
+  }
 }

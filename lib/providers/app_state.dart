@@ -1,59 +1,91 @@
 import 'package:flutter/foundation.dart';
 import '../models/assessment_result.dart';
 import '../models/chat_message.dart';
+import '../services/ai_service.dart';
 import '../services/auth_service.dart';
+import '../services/storage_service.dart';
 
-/// App-wide state. In-memory for now; Step 4 persists sign-in and
-/// score history per user in Firebase.
 class AppState extends ChangeNotifier {
   final _auth = AuthService();
+  final _storage = StorageService();
+  final _ai = AiService();
 
   bool isSignedIn = false;
+  String? email;
+  bool marcusTyping = false;
   AssessmentResult? latestResult;
   final List<AssessmentResult> history = [];
   final List<ChatMessage> messages = [];
 
-  Future<void> signInWithGoogle() async {
-    if (await _auth.signInWithGoogle()) {
-      isSignedIn = true;
-      notifyListeners();
-    }
+  AppState() {
+    _restoreSession();
   }
 
-  Future<void> signInWithApple() async {
-    if (await _auth.signInWithApple()) {
-      isSignedIn = true;
-      notifyListeners();
-    }
+  /// If the user signed in before, Firebase restores the session
+  /// automatically — they land straight on their dashboard.
+  Future<void> _restoreSession() async {
+    final restored = await _auth.restoreSession();
+    if (restored) await _afterAuth();
   }
+
+  Future<void> _afterAuth() async {
+    isSignedIn = true;
+    email = _auth.currentEmail;
+    final items = await _storage.loadHistory(_auth.currentUid);
+    history
+      ..clear()
+      ..addAll(items);
+    latestResult = history.isNotEmpty ? history.last : null;
+    notifyListeners();
+  }
+
+  /// Returns null on success, or an error message for the UI.
+  Future<String?> signUp(String emailAddr, String password) async {
+    final err = await _auth.signUp(emailAddr.trim(), password);
+    if (err == null) await _afterAuth();
+    return err;
+  }
+
+  /// Returns null on success, or an error message for the UI.
+  Future<String?> signIn(String emailAddr, String password) async {
+    final err = await _auth.signIn(emailAddr.trim(), password);
+    if (err == null) await _afterAuth();
+    return err;
+  }
+
+  Future<String?> resetPassword(String emailAddr) =>
+      _auth.resetPassword(emailAddr.trim());
 
   Future<void> signOut() async {
     await _auth.signOut();
     isSignedIn = false;
+    email = null;
+    latestResult = null;
+    history.clear();
+    messages.clear();
+    marcusTyping = false;
     notifyListeners();
   }
 
-  void saveResult(AssessmentResult result) {
+  Future<void> saveResult(AssessmentResult result) async {
     latestResult = result;
     history.add(result);
     notifyListeners();
+    await _storage.saveHistory(_auth.currentUid, history);
   }
 
-  /// Marcus chat. The reply is a placeholder until the AI backend
-  /// lands in Step 6 — but it ALREADY receives the latest score, so
-  /// you can see how context will flow into the real conversation.
-  void sendMessage(String text) {
-    if (text.trim().isEmpty) return;
+  /// Marcus chat — real AI when an API key is set in
+  /// lib/services/ai_service.dart, placeholder otherwise.
+  Future<void> sendMessage(String text) async {
+    if (text.trim().isEmpty || marcusTyping) return;
     messages.add(ChatMessage(text: text.trim(), fromUser: true));
-    messages.add(ChatMessage(text: _marcusPlaceholder(), fromUser: false));
+    marcusTyping = true;
     notifyListeners();
-  }
 
-  String _marcusPlaceholder() {
-    final r = latestResult;
-    final context = r == null
-        ? "Once you take your first assessment I'll tailor everything to your Neural Calm Score."
-        : "I can see your latest Neural Calm Score is ${r.overall.round()}, with ${r.focusArea.toLowerCase()} as your focus area — that's where we'll start.";
-    return "Thanks for sharing. $context (I'm a placeholder reply for now — my real AI arrives in Step 6.)";
+    final reply = await _ai.reply(List.of(messages), latestResult);
+
+    marcusTyping = false;
+    messages.add(ChatMessage(text: reply, fromUser: false));
+    notifyListeners();
   }
 }

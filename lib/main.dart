@@ -1,11 +1,23 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'firebase_options.dart';
 import 'providers/app_state.dart';
 import 'screens/main_shell.dart';
 import 'screens/sign_in_screen.dart';
 import 'theme/app_theme.dart';
 
-void main() => runApp(const NeuralCalmApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  if (DefaultFirebaseOptions.isConfigured) {
+    try {
+      await Firebase.initializeApp(options: DefaultFirebaseOptions.current);
+    } catch (_) {
+      // App still runs in local mode if Firebase init fails.
+    }
+  }
+  runApp(const NeuralCalmApp());
+}
 
 class NeuralCalmApp extends StatelessWidget {
   const NeuralCalmApp({super.key});

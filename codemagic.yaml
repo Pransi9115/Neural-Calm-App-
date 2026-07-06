@@ -1,19 +1,45 @@
 # ─────────────────────────────────────────────────────────────
 # NeuralCalm — cloud builds, no local Flutter needed.
 #
-# This repo ships only lib/ + pubspec.yaml. The first script of
-# every workflow runs `flutter create .` on Codemagic's machine
-# to generate the android/ and ios/ native folders, then restores
-# our pubspec. So the repo stays clean and you never run Flutter
-# on your own PC.
+# The repo ships only lib/ + assets/ + pubspec.yaml. Each build:
+#  1. generates the android/ and ios/ native folders,
+#  2. applies required Android tweaks (minSdk 23 for Firebase,
+#     INTERNET permission for release builds),
+#  3. generates the app launcher icon from assets/icon/app_icon.png,
+#  4. builds.
 # ─────────────────────────────────────────────────────────────
+
+definitions:
+  scripts:
+    - &create_platforms
+      name: Generate native platform folders
+      script: |
+        cp pubspec.yaml pubspec.keep.yaml
+        flutter create . --org com.neuralcalm --project-name neuralcalm --platforms=android,ios
+        mv -f pubspec.keep.yaml pubspec.yaml
+    - &android_tweaks
+      name: Android tweaks (minSdk 23 + INTERNET permission)
+      script: |
+        for f in android/app/build.gradle android/app/build.gradle.kts; do
+          if [ -f "$f" ]; then sed -i.bak 's/flutter.minSdkVersion/23/g' "$f"; fi
+        done
+        M=android/app/src/main/AndroidManifest.xml
+        if [ -f "$M" ] && ! grep -q "android.permission.INTERNET" "$M"; then
+          sed -i.bak 's|<application|<uses-permission android:name="android.permission.INTERNET"/><application|' "$M"
+        fi
+    - &pub_get
+      name: Get packages
+      script: flutter pub get
+    - &launcher_icons
+      name: Generate app launcher icons
+      script: dart run flutter_launcher_icons
 
 workflows:
 
   # 1) Runs automatically on every push to main → debug APK for your phone.
   android-debug:
     name: Android debug APK
-    max_build_duration: 45
+    max_build_duration: 60
     environment:
       flutter: stable
     triggering:
@@ -23,13 +49,10 @@ workflows:
         - pattern: main
           include: true
     scripts:
-      - name: Generate native platform folders
-        script: |
-          cp pubspec.yaml pubspec.keep.yaml
-          flutter create . --org com.neuralcalm --project-name neuralcalm --platforms=android,ios
-          mv -f pubspec.keep.yaml pubspec.yaml
-      - name: Get packages
-        script: flutter pub get
+      - *create_platforms
+      - *android_tweaks
+      - *pub_get
+      - *launcher_icons
       - name: Build debug APK
         script: flutter build apk --debug
     artifacts:
@@ -44,23 +67,18 @@ workflows:
     environment:
       flutter: stable
     scripts:
-      - name: Generate native platform folders
-        script: |
-          cp pubspec.yaml pubspec.keep.yaml
-          flutter create . --org com.neuralcalm --project-name neuralcalm --platforms=android,ios
-          mv -f pubspec.keep.yaml pubspec.yaml
-      - name: Get packages
-        script: flutter pub get
+      - *create_platforms
+      - *android_tweaks
+      - *pub_get
+      - *launcher_icons
       - name: Build release AAB
         script: flutter build appbundle --release
     artifacts:
       - build/app/outputs/bundle/release/*.aab
 
-  # 3) Start manually. Codemagic machines are Macs, so this verifies
-  #    the iOS build compiles from Windows with no Mac owned.
-  #    Real device installs / App Store need your Apple Developer
-  #    account ($99/yr) connected in Codemagic — we set that up at
-  #    store-prep time.
+  # 3) Start manually. Verifies the iOS build compiles (Codemagic
+  #    machines are Macs). Device installs / App Store need your
+  #    Apple Developer account connected — done at store-prep time.
   ios-verify:
     name: iOS build check (unsigned - manual)
     max_build_duration: 60
@@ -68,13 +86,9 @@ workflows:
     environment:
       flutter: stable
     scripts:
-      - name: Generate native platform folders
-        script: |
-          cp pubspec.yaml pubspec.keep.yaml
-          flutter create . --org com.neuralcalm --project-name neuralcalm --platforms=android,ios
-          mv -f pubspec.keep.yaml pubspec.yaml
-      - name: Get packages
-        script: flutter pub get
+      - *create_platforms
+      - *pub_get
+      - *launcher_icons
       - name: Build iOS (unsigned)
         script: flutter build ios --release --no-codesign
     artifacts:

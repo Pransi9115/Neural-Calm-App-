@@ -99,7 +99,7 @@ class HomeScreen extends StatelessWidget {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        "You've taken ${state.history.length} assessments. Score history syncs to your account in Step 4.",
+                        "You've taken ${state.history.length} assessments. Your history is saved to your account.",
                         style: const TextStyle(
                             fontSize: 13,
                             color: AppColors.primaryDeep,
