@@ -7,7 +7,6 @@ import 'chat_screen.dart';
 import 'home_screen.dart';
 import 'profile_screen.dart';
 
-/// The 5-tab shell: Home, Assess, Marcus, Body, Profile.
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -34,22 +33,20 @@ class _MainShellState extends State<MainShell> {
         currentIndex: _index,
         onTap: (i) => setState(() => _index = i),
         type: BottomNavigationBarType.fixed,
-        backgroundColor: AppColors.surface,
-        selectedItemColor: AppColors.primary,
-        unselectedItemColor: AppColors.inkMuted,
-        selectedFontSize: 12,
-        unselectedFontSize: 12,
+        backgroundColor: AppColors.navy,
+        selectedItemColor: Colors.white,
+        unselectedItemColor: AppColors.onNavy,
+        selectedFontSize: 11,
+        unselectedFontSize: 11,
         items: const [
-          BottomNavigationBarItem(
-              icon: Icon(LucideIcons.house), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(LucideIcons.house), label: 'Home'),
           BottomNavigationBarItem(
               icon: Icon(LucideIcons.clipboardList), label: 'Assess'),
           BottomNavigationBarItem(
               icon: Icon(LucideIcons.messageCircle), label: 'Marcus'),
           BottomNavigationBarItem(
               icon: Icon(LucideIcons.heartPulse), label: 'Body'),
-          BottomNavigationBarItem(
-              icon: Icon(LucideIcons.user), label: 'Profile'),
+          BottomNavigationBarItem(icon: Icon(LucideIcons.user), label: 'Profile'),
         ],
       ),
     );

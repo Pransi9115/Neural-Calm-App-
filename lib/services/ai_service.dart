@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../constants/zones.dart';
 import '../models/assessment_result.dart';
 import '../models/chat_message.dart';
 
@@ -36,13 +37,14 @@ class AiService {
   String _systemPrompt(AssessmentResult? latest) {
     final scoreContext = latest == null
         ? 'The user has not taken an assessment yet — gently encourage them to take their first one from the Assess tab.'
-        : 'Latest Neural Calm Score: ${latest.overall.round()}/100. '
-            'Category breakdown (higher = calmer): '
-            '${latest.categories.entries.map((e) => '${e.key} ${e.value.round()}').join(', ')}. '
-            'Current focus area: ${latest.focusArea}.';
+        : 'Latest Neural Calm Score: ${latest.overall}/100 — LOWER is calmer. '
+            'Zone: ${latest.zone.label} (Optimal 0-35, Moderate 36-60, Elevated 61-100). '
+            'Domain scores (0-100, lower = calmer): '
+            '${latest.domainScores.entries.map((e) => '${e.key} ${e.value}').join(', ')}.';
     return 'You are Marcus, the warm, encouraging wellbeing companion inside the '
         'NeuralCalm app. Keep replies short (2-5 sentences), practical and kind. '
-        'Base advice on the user\'s data when relevant. $scoreContext '
+        'Base advice on the user\'s data when relevant, and remember the scale: '
+        'a LOWER Neural Calm Score is better. $scoreContext '
         'You are a wellbeing tool, not a doctor: never diagnose, and suggest '
         'professional help for anything medical or a crisis.';
   }
@@ -167,7 +169,7 @@ class AiService {
   String _placeholder(AssessmentResult? latest) {
     final context = latest == null
         ? "Once you take your first assessment I'll tailor everything to your Neural Calm Score."
-        : "I can see your latest Neural Calm Score is ${latest.overall.round()}, with ${latest.focusArea.toLowerCase()} as your focus area.";
+        : "I can see your latest Neural Calm Score is ${latest.overall} — ${latest.zone.label} zone.";
     return 'Thanks for sharing. $context (My real AI is one step away — '
         'paste a FREE Gemini key from aistudio.google.com into '
         'lib/services/ai_service.dart and I come to life.)';

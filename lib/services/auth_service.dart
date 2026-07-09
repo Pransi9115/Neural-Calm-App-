@@ -1,44 +1,47 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import '../firebase_options.dart';
 
-/// Real accounts via Firebase Auth (email + password).
-/// If Firebase isn't configured yet (see lib/firebase_options.dart),
-/// it falls back to LOCAL MODE so the app stays fully usable.
+/// Firebase Auth (email + password) with the user's full name
+/// stored as displayName — it appears on the professional report.
+/// Falls back to local mode if Firebase isn't configured.
 class AuthService {
   bool _localSignedIn = false;
   String? _localEmail;
+  String? _localName;
 
   bool get _useFirebase => DefaultFirebaseOptions.isConfigured;
 
-  bool get isSignedIn => _useFirebase
-      ? FirebaseAuth.instance.currentUser != null
-      : _localSignedIn;
+  bool get isSignedIn =>
+      _useFirebase ? FirebaseAuth.instance.currentUser != null : _localSignedIn;
 
-  String? get currentEmail => _useFirebase
-      ? FirebaseAuth.instance.currentUser?.email
-      : _localEmail;
+  String? get currentEmail =>
+      _useFirebase ? FirebaseAuth.instance.currentUser?.email : _localEmail;
+
+  String? get currentName => _useFirebase
+      ? FirebaseAuth.instance.currentUser?.displayName
+      : _localName;
 
   String get currentUid => _useFirebase
       ? (FirebaseAuth.instance.currentUser?.uid ?? 'local')
       : 'local';
 
-  /// Waits for Firebase to restore a previous session on app start.
   Future<bool> restoreSession() async {
     if (!_useFirebase) return false;
     final user = await FirebaseAuth.instance.authStateChanges().first;
     return user != null;
   }
 
-  /// Returns null on success, or a message to show the user.
-  Future<String?> signUp(String email, String password) async {
+  Future<String?> signUp(String name, String email, String password) async {
     if (!_useFirebase) {
       _localSignedIn = true;
       _localEmail = email;
+      _localName = name;
       return null;
     }
     try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: email, password: password);
+      final cred = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(email: email, password: password);
+      await cred.user?.updateDisplayName(name);
       return null;
     } on FirebaseAuthException catch (e) {
       return e.message ?? 'Could not create the account.';
@@ -47,11 +50,11 @@ class AuthService {
     }
   }
 
-  /// Returns null on success, or a message to show the user.
   Future<String?> signIn(String email, String password) async {
     if (!_useFirebase) {
       _localSignedIn = true;
       _localEmail = email;
+      _localName ??= email.split('@').first;
       return null;
     }
     try {
@@ -65,7 +68,6 @@ class AuthService {
     }
   }
 
-  /// Returns null on success, or a message to show the user.
   Future<String?> resetPassword(String email) async {
     if (!_useFirebase) {
       return 'Password reset needs cloud accounts (Firebase) connected.';
@@ -82,5 +84,6 @@ class AuthService {
     if (_useFirebase) await FirebaseAuth.instance.signOut();
     _localSignedIn = false;
     _localEmail = null;
+    _localName = null;
   }
 }

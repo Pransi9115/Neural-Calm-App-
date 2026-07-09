@@ -6,12 +6,13 @@ import '../../providers/app_state.dart';
 import '../../services/scoring_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/answer_pill.dart';
+import '../../widgets/answer_option.dart';
 import '../../widgets/primary_button.dart';
-import 'results_screen.dart';
+import 'report_screen.dart';
 
-/// The full 6-step assessment:
-/// steps 0–4 = the questionnaire sections, step 5 = optional biometrics.
+/// One question per screen, exactly the coach-tool questionnaire.
+/// Answers auto-save; a half-finished assessment resumes where it
+/// left off. Finishing opens the Professional report directly.
 class AssessmentScreen extends StatefulWidget {
   const AssessmentScreen({super.key});
 
@@ -20,266 +21,243 @@ class AssessmentScreen extends StatefulWidget {
 }
 
 class _AssessmentScreenState extends State<AssessmentScreen> {
-  int _step = 0;
-  final Map<String, int> _answers = {};
+  Map<String, int> _answers = {};
+  int _flatIndex = 0;
+  bool _loaded = false;
+  bool _finishing = false;
 
-  final _sleepCtrl = TextEditingController();
-  final _hrCtrl = TextEditingController();
-  final _exerciseCtrl = TextEditingController();
+  // Flat list of (domainIndex, questionIndex).
+  late final List<(int, int)> _order = [
+    for (var d = 0; d < domains.length; d++)
+      for (var q = 0; q < domains[d].questions.length; q++) (d, q)
+  ];
 
-  int get _totalSteps => sections.length + 1; // + biometrics
-  bool get _isBiometricStep => _step == sections.length;
-
-  bool get _stepComplete {
-    if (_isBiometricStep) return true; // biometrics are optional
-    return sections[_step].questions.every((q) => _answers.containsKey(q.id));
+  String _key(int flat) {
+    final (d, q) = _order[flat];
+    return '${domains[d].id}_$q';
   }
 
   @override
-  void dispose() {
-    _sleepCtrl.dispose();
-    _hrCtrl.dispose();
-    _exerciseCtrl.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _restore();
   }
 
-  void _next() {
-    if (_step < _totalSteps - 1) {
-      setState(() => _step++);
-    } else {
-      _finish();
+  Future<void> _restore() async {
+    final state = context.read<AppState>();
+    final saved = await state.storage.loadProgress(state.auth.currentUid);
+    var start = 0;
+    for (var i = 0; i < _order.length; i++) {
+      if (!saved.containsKey(_key(i))) {
+        start = i;
+        break;
+      }
+      if (i == _order.length - 1) start = i; // everything answered
     }
+    if (!mounted) return;
+    setState(() {
+      _answers = saved;
+      _flatIndex = start;
+      _loaded = true;
+    });
   }
 
-  void _finish() {
-    final result = ScoringService.score(
-      answers: _answers,
-      sleepHours: double.tryParse(_sleepCtrl.text.trim()),
-      restingHeartRate: int.tryParse(_hrCtrl.text.trim()),
-      exerciseMinutes: int.tryParse(_exerciseCtrl.text.trim()),
-    );
-    context.read<AppState>().saveResult(result);
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => ResultsScreen(result: result)),
+  Future<void> _select(int value) async {
+    final state = context.read<AppState>();
+    setState(() => _answers[_key(_flatIndex)] = value);
+    await state.storage.saveProgress(state.auth.currentUid, _answers);
+  }
+
+  bool get _isLast => _flatIndex == _order.length - 1;
+  bool get _currentAnswered => _answers.containsKey(_key(_flatIndex));
+
+  bool get _showSafetyCard {
+    final (d, q) = _order[_flatIndex];
+    if (domains[d].id != safeguardDomainId || q != safeguardQuestionIndex) {
+      return false;
+    }
+    final v = _answers[_key(_flatIndex)];
+    return v != null && v >= safeguardThreshold;
+  }
+
+  Future<void> _finish() async {
+    if (_finishing) return;
+    setState(() => _finishing = true);
+    final state = context.read<AppState>();
+    final result =
+        ScoringService.score(_answers, number: state.history.length + 1);
+    await state.saveResult(result, Map.of(_answers));
+    await state.storage.clearProgress(state.auth.currentUid);
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(MaterialPageRoute(
+        builder: (_) => ReportScreen(result: result, isNew: true)));
+  }
+
+  void _showSupportResources() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text('You are not alone', style: cormorant(size: 22)),
+        content: const Text(
+          'Thank you for answering honestly — that takes real courage.\n\n'
+          'If these thoughts are present, please consider talking to someone you trust, your doctor, or a mental health professional. Suicide-prevention helplines are available in your country and are free and confidential.\n\n'
+          'If you are in immediate danger, contact your local emergency services right now.',
+          style: TextStyle(fontSize: 13.5, height: 1.55, color: AppColors.ink),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!_loaded) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator(color: AppColors.purple)),
+      );
+    }
+    final (d, q) = _order[_flatIndex];
+    final domain = domains[d];
+    final question = domain.questions[q];
+    final selected = _answers[_key(_flatIndex)];
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(LucideIcons.x),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text('Step ${_step + 1} of $_totalSteps',
-            style: const TextStyle(fontSize: 15)),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(4),
-          child: LinearProgressIndicator(
-            value: (_step + 1) / _totalSteps,
-            backgroundColor: AppColors.lavenderSoft,
-            color: AppColors.primary,
-            minHeight: 4,
+        title: Text(domain.title),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Center(
+              child: Text('Domain ${d + 1} of ${domains.length}',
+                  style:
+                      const TextStyle(color: AppColors.onNavy, fontSize: 12)),
+            ),
           ),
-        ),
+        ],
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child:
-                  _isBiometricStep ? _biometricStep() : _questionStep(),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  if (_step > 0)
-                    OutlinedButton(
-                      onPressed: () => setState(() => _step--),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.primaryDeep,
-                        side: const BorderSide(color: AppColors.border),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 16),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16)),
-                      ),
-                      child: const Text('Back'),
+        child: Column(children: [
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('QUESTION ${q + 1} OF ${domain.questions.length}',
+                        style: secLabel()),
+                    if (_currentAnswered)
+                      Text('✓ saved',
+                          style: secLabel(color: AppColors.green)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(
+                    value: _answers.length / _order.length,
+                    minHeight: 5,
+                    backgroundColor: AppColors.purplePale,
+                    color: AppColors.purple,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(question.text,
+                            style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                height: 1.4)),
+                        const SizedBox(height: 12),
+                        for (var i = 0; i < question.options.length; i++)
+                          AnswerOption(
+                            index: i,
+                            label: question.options[i],
+                            selected: selected == i,
+                            onTap: () => _select(i),
+                          ),
+                      ]),
+                ),
+                if (_showSafetyCard) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.purplePale,
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                  if (_step > 0) const SizedBox(width: 12),
-                  Expanded(
-                    child: PrimaryButton(
-                      label: _step == _totalSteps - 1
-                          ? 'See my score'
-                          : 'Next',
-                      onPressed: _stepComplete ? _next : null,
-                    ),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('You matter 💜',
+                              style: cormorant(
+                                  size: 18, color: AppColors.purpleDeep)),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Thank you for being honest — that takes courage. Support is available whenever you need it, and talking to someone can genuinely help.',
+                            style: TextStyle(
+                                fontSize: 12.5,
+                                height: 1.5,
+                                color: AppColors.purpleDeep),
+                          ),
+                          const SizedBox(height: 10),
+                          PrimaryButton(
+                            label: 'View support resources',
+                            background: AppColors.purpleDeep,
+                            onPressed: _showSupportResources,
+                          ),
+                        ]),
                   ),
                 ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _questionStep() {
-    final section = sections[_step];
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: const BoxDecoration(
-                color: AppColors.lavenderSoft,
-                shape: BoxShape.circle,
-              ),
-              child:
-                  Icon(section.icon, size: 22, color: AppColors.primaryDeep),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(section.title,
-                      style: fraunces(
-                          size: 24, color: AppColors.primaryDeep)),
-                  Text(section.subtitle,
-                      style: const TextStyle(
-                          fontSize: 13, color: AppColors.inkMuted)),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        ...section.questions.map(_questionCard),
-      ],
-    );
-  }
-
-  Widget _questionCard(Question q) {
-    return Container(
-      margin: const EdgeInsets.only(top: 14),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(q.text,
-              style:
-                  const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: List.generate(answerLabels.length, (i) {
-              return AnswerPill(
-                label: answerLabels[i],
-                selected: _answers[q.id] == i,
-                onTap: () => setState(() => _answers[q.id] = i),
-              );
-            }),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _biometricStep() {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: const BoxDecoration(
-                color: AppColors.lavenderSoft,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(LucideIcons.heartPulse,
-                  size: 22, color: AppColors.primaryDeep),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Biometric Data',
-                      style: fraunces(
-                          size: 24, color: AppColors.primaryDeep)),
-                  const Text('Optional — leave blank to skip',
-                      style: TextStyle(
-                          fontSize: 13, color: AppColors.inkMuted)),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        const Padding(
-          padding: EdgeInsets.only(top: 12),
-          child: Text(
-            'If you know these, they refine your score (20% weighting). In Step 5 the app will read them automatically from Apple Health / Health Connect.',
-            style: TextStyle(color: AppColors.inkMuted, height: 1.5),
-          ),
-        ),
-        _bioField(_sleepCtrl, 'Average sleep per night', 'e.g. 7.5', 'hours'),
-        _bioField(_hrCtrl, 'Resting heart rate', 'e.g. 64', 'bpm'),
-        _bioField(
-            _exerciseCtrl, 'Movement / exercise per day', 'e.g. 30', 'min'),
-      ],
-    );
-  }
-
-  Widget _bioField(TextEditingController ctrl, String label, String hint,
-      String suffix) {
-    return Container(
-      margin: const EdgeInsets.only(top: 14),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label,
-              style:
-                  const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 10),
-          TextField(
-            controller: ctrl,
-            keyboardType:
-                const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(
-              hintText: hint,
-              suffixText: suffix,
-              filled: true,
-              fillColor: AppColors.background,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.border),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.border),
-              ),
+              ],
             ),
           ),
-        ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 14),
+            child: Row(children: [
+              if (_flatIndex > 0)
+                Expanded(
+                  child: PrimaryButton(
+                    label: 'Back',
+                    ghost: true,
+                    onPressed: () => setState(() => _flatIndex--),
+                  ),
+                ),
+              if (_flatIndex > 0) const SizedBox(width: 10),
+              Expanded(
+                flex: 2,
+                child: PrimaryButton(
+                  label: _isLast ? 'Finish & view report' : 'Next question',
+                  onPressed: !_currentAnswered
+                      ? null
+                      : _isLast
+                          ? _finish
+                          : () => setState(() => _flatIndex++),
+                ),
+              ),
+            ]),
+          ),
+        ]),
       ),
     );
   }

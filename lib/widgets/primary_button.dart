@@ -5,45 +5,52 @@ class PrimaryButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
   final IconData? icon;
+  final bool ghost;
   final Color background;
-  final Color foreground;
 
   const PrimaryButton({
     super.key,
     required this.label,
     required this.onPressed,
     this.icon,
-    this.background = AppColors.primary,
-    this.foreground = Colors.white,
+    this.ghost = false,
+    this.background = AppColors.purple,
   });
 
   @override
   Widget build(BuildContext context) {
+    final style = ghost
+        ? FilledButton.styleFrom(
+            backgroundColor: AppColors.surface,
+            foregroundColor: AppColors.purpleDeep,
+            side: const BorderSide(color: AppColors.border, width: 1.4),
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          )
+        : FilledButton.styleFrom(
+            backgroundColor: background,
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: AppColors.purplePale,
+            disabledForegroundColor: AppColors.muted,
+            elevation: 3,
+            shadowColor: background.withValues(alpha: .45),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          );
     return SizedBox(
       width: double.infinity,
       child: FilledButton(
         onPressed: onPressed,
-        style: FilledButton.styleFrom(
-          backgroundColor: background,
-          foregroundColor: foreground,
-          disabledBackgroundColor: AppColors.lavenderSoft,
-          disabledForegroundColor: AppColors.inkMuted,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (icon != null) ...[
-              Icon(icon, size: 20),
-              const SizedBox(width: 10),
-            ],
-            Text(label,
-                style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-          ],
-        ),
+        style: style,
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          if (icon != null) ...[Icon(icon, size: 19), const SizedBox(width: 9)],
+          Text(label,
+              style:
+                  const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600)),
+        ]),
       ),
     );
   }

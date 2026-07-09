@@ -3,15 +3,18 @@ import '../models/assessment_result.dart';
 import '../models/chat_message.dart';
 import '../services/ai_service.dart';
 import '../services/auth_service.dart';
+import '../services/backend_service.dart';
 import '../services/storage_service.dart';
 
 class AppState extends ChangeNotifier {
-  final _auth = AuthService();
-  final _storage = StorageService();
+  final auth = AuthService();
+  final storage = StorageService();
   final _ai = AiService();
+  final _backend = BackendService();
 
   bool isSignedIn = false;
   String? email;
+  String? name;
   bool marcusTyping = false;
   AssessmentResult? latestResult;
   final List<AssessmentResult> history = [];
@@ -21,17 +24,15 @@ class AppState extends ChangeNotifier {
     _restoreSession();
   }
 
-  /// If the user signed in before, Firebase restores the session
-  /// automatically — they land straight on their dashboard.
   Future<void> _restoreSession() async {
-    final restored = await _auth.restoreSession();
-    if (restored) await _afterAuth();
+    if (await auth.restoreSession()) await _afterAuth();
   }
 
   Future<void> _afterAuth() async {
     isSignedIn = true;
-    email = _auth.currentEmail;
-    final items = await _storage.loadHistory(_auth.currentUid);
+    email = auth.currentEmail;
+    name = auth.currentName ?? email?.split('@').first ?? 'You';
+    final items = await storage.loadHistory(auth.currentUid);
     history
       ..clear()
       ..addAll(items);
@@ -39,27 +40,26 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Returns null on success, or an error message for the UI.
-  Future<String?> signUp(String emailAddr, String password) async {
-    final err = await _auth.signUp(emailAddr.trim(), password);
+  Future<String?> signUp(String fullName, String emailAddr, String password) async {
+    final err = await auth.signUp(fullName.trim(), emailAddr.trim(), password);
     if (err == null) await _afterAuth();
     return err;
   }
 
-  /// Returns null on success, or an error message for the UI.
   Future<String?> signIn(String emailAddr, String password) async {
-    final err = await _auth.signIn(emailAddr.trim(), password);
+    final err = await auth.signIn(emailAddr.trim(), password);
     if (err == null) await _afterAuth();
     return err;
   }
 
   Future<String?> resetPassword(String emailAddr) =>
-      _auth.resetPassword(emailAddr.trim());
+      auth.resetPassword(emailAddr.trim());
 
   Future<void> signOut() async {
-    await _auth.signOut();
+    await auth.signOut();
     isSignedIn = false;
     email = null;
+    name = null;
     latestResult = null;
     history.clear();
     messages.clear();
@@ -67,23 +67,28 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> saveResult(AssessmentResult result) async {
+  /// Saves locally, then syncs to the PHP backend (if configured).
+  Future<void> saveResult(
+      AssessmentResult result, Map<String, int> answers) async {
     latestResult = result;
     history.add(result);
     notifyListeners();
-    await _storage.saveHistory(_auth.currentUid, history);
+    await storage.saveHistory(auth.currentUid, history);
+    _backend.submitAssessment(
+      uid: auth.currentUid,
+      name: name ?? '',
+      email: email ?? '',
+      result: result,
+      answers: answers,
+    );
   }
 
-  /// Marcus chat — real AI when an API key is set in
-  /// lib/services/ai_service.dart, placeholder otherwise.
   Future<void> sendMessage(String text) async {
     if (text.trim().isEmpty || marcusTyping) return;
     messages.add(ChatMessage(text: text.trim(), fromUser: true));
     marcusTyping = true;
     notifyListeners();
-
     final reply = await _ai.reply(List.of(messages), latestResult);
-
     marcusTyping = false;
     messages.add(ChatMessage(text: reply, fromUser: false));
     notifyListeners();

@@ -1,17 +1,24 @@
 import 'package:flutter/material.dart';
 
-/// Central palette — matched to neuralcalm.com.
-/// Every screen pulls colors from here; nothing hardcodes a hex.
+/// Design system — extracted from the NeuralCalm backend (coach tool)
+/// and the approved v5 mockup. No screen hardcodes a hex.
 class AppColors {
-  static const background = Color(0xFFF7F5FC); // soft lavender-white page
-  static const surface = Colors.white; // cards
-  static const primary = Color(0xFF7C6FDE); // NeuralCalm lavender
-  static const primaryDeep = Color(0xFF4B3F9E); // headings on light lavender
-  static const lavenderSoft = Color(0xFFE9E4FA); // fills, rings, chips
-  static const ink = Color(0xFF2B2440); // main text
-  static const inkMuted = Color(0xFF6F6890); // secondary text
-  static const border = Color(0xFFE3DEF2); // hairlines, pill outlines
-  static const success = Color(0xFF5FBF9F); // strong category score
-  static const warning = Color(0xFFE8A66B); // mid category score
-  static const danger = Color(0xFFE07A7A); // low category score
+  static const navy = Color(0xFF1E1148);        // chrome: bars, letterhead
+  static const background = Color(0xFFF5F2FC);  // light lavender pages
+  static const surface = Colors.white;          // cards
+  static const purple = Color(0xFF7E5CE6);      // primary: buttons, accents
+  static const purpleDeep = Color(0xFF3A1F82);
+  static const purpleLight = Color(0xFF9B7ED4); // "Calm" in the wordmark
+  static const purplePale = Color(0xFFE4DBF9);  // fills, rings, chips
+  static const border = Color(0xFFDFD6F4);
+  static const ink = Color(0xFF1E1148);
+  static const muted = Color(0xFF6B5F8A);
+  static const onNavy = Color(0xFFC0B4DC);      // secondary text on navy
+  static const green = Color(0xFF16A34A);
+  static const greenPale = Color(0xFFDCFCE7);
+  static const amber = Color(0xFFD97706);
+  static const amberPale = Color(0xFFFEF3C7);
+  static const red = Color(0xFFDC2626);
+  static const redPale = Color(0xFFFEE2E2);
+  static const redDark = Color(0xFF991B1B);
 }

@@ -2,19 +2,19 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/assessment_result.dart';
 
-/// Persists each user's score history on the device, keyed by their
-/// account uid — so history survives app restarts and each account
-/// keeps its own history on a shared phone.
+/// On-device persistence, per account uid:
+///  · completed assessment history
+///  · in-progress answers (so a half-finished assessment resumes)
 class StorageService {
-  String _key(String uid) => 'nc_history_$uid';
+  String _histKey(String uid) => 'nc2_history_$uid';
+  String _progKey(String uid) => 'nc2_progress_$uid';
 
   Future<List<AssessmentResult>> loadHistory(String uid) async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key(uid));
+    final raw = prefs.getString(_histKey(uid));
     if (raw == null) return [];
     try {
-      final list = jsonDecode(raw) as List;
-      return list
+      return (jsonDecode(raw) as List)
           .map((e) => AssessmentResult.fromJson(e as Map<String, dynamic>))
           .toList();
     } catch (_) {
@@ -25,6 +25,28 @@ class StorageService {
   Future<void> saveHistory(String uid, List<AssessmentResult> history) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
-        _key(uid), jsonEncode(history.map((r) => r.toJson()).toList()));
+        _histKey(uid), jsonEncode(history.map((r) => r.toJson()).toList()));
+  }
+
+  Future<Map<String, int>> loadProgress(String uid) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_progKey(uid));
+    if (raw == null) return {};
+    try {
+      return (jsonDecode(raw) as Map<String, dynamic>)
+          .map((k, v) => MapEntry(k, (v as num).toInt()));
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> saveProgress(String uid, Map<String, int> answers) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_progKey(uid), jsonEncode(answers));
+  }
+
+  Future<void> clearProgress(String uid) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_progKey(uid));
   }
 }

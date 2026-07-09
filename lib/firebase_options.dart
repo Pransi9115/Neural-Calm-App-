@@ -1,10 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 
-/// ─────────────────────────────────────────────────────────────
-/// STEP 4 — Firebase connection for the "Neural Calm App" project.
-/// Values filled in from google-services.json on 2026-07-06.
-/// Cloud accounts are LIVE once this file is in the build.
-/// ─────────────────────────────────────────────────────────────
+/// Firebase connection for the "Neural Calm App" project — LIVE.
 class DefaultFirebaseOptions {
   static const String apiKey = 'AIzaSyBZgL65Mb1cZ7BctTqbXmwzuKBP0Rsg0cE';
   static const String appId = '1:973335521953:android:54b653ca3094ccdda49ee0';
