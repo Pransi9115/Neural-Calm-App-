@@ -164,11 +164,11 @@ class ReportScreen extends StatelessWidget {
                     clientName: state.name ?? 'NeuralCalm user',
                     email: state.email,
                     history: state.history);
-              } catch (_) {
+              } catch (e) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content:
-                          Text('Could not create the PDF — please try again.')));
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      duration: const Duration(seconds: 8),
+                      content: Text('PDF error: $e')));
                 }
               }
             },

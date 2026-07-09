@@ -30,17 +30,10 @@ class AiService {
   Future<String> reply(
       List<ChatMessage> conversation, AssessmentResult? latest) async {
     if (anthropicKey.isNotEmpty) return _anthropic(conversation, latest);
-    if (geminiKey.isNotEmpty) {
-      if (!geminiKey.startsWith('AIza')) {
-        return 'Setup check: the Gemini key built into this app starts with '
-            '"${geminiKey.substring(0, geminiKey.length < 4 ? geminiKey.length : 4)}..." '
-            'but real Gemini API keys always start with "AIza". Please open '
-            'aistudio.google.com -> Get API key -> Create API key, copy the '
-            'AIza... value into Codemagic -> Environment variables '
-            '(name GEMINI_API_KEY, group "keys"), then run a new build.';
-      }
-      return _gemini(conversation, latest);
-    }
+    // Gemini keys may start with "AIza" (old) or "AQ." (new format since
+    // mid-2026) — both work on the native endpoint used below, so we never
+    // judge the key's shape here; Google's API is the judge.
+    if (geminiKey.isNotEmpty) return _gemini(conversation, latest);
     return _placeholder(latest);
   }
 
@@ -183,7 +176,7 @@ class AiService {
         : "I can see your latest Neural Calm Score is ${latest.overall} — ${latest.zone.label} zone.";
     return 'Thanks for sharing. $context (Setup check: NO AI key was included '
         'in this build. In Codemagic open your app -> Environment variables, '
-        'add GEMINI_API_KEY with your AIza... key from aistudio.google.com, '
+        'add GEMINI_API_KEY with your key from aistudio.google.com, '
         'put it in a group named exactly "keys", tick Secure, save — then '
         'run a NEW build.)';
   }

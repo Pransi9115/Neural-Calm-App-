@@ -363,31 +363,37 @@ class ReportPdf {
             )
           else
             ...r.flags.map((f) => pw.Container(
-                  width: double.infinity,
                   margin: const pw.EdgeInsets.only(bottom: 5),
-                  padding: const pw.EdgeInsets.symmetric(
-                      horizontal: 9, vertical: 6),
-                  decoration: const pw.BoxDecoration(
-                    color: _redPale,
-                    border: pw.Border(
-                        left: pw.BorderSide(color: _red, width: 2.5)),
-                    borderRadius: pw.BorderRadius.only(
-                        topRight: pw.Radius.circular(6),
-                        bottomRight: pw.Radius.circular(6)),
-                  ),
-                  child: pw.RichText(
-                      text: pw.TextSpan(children: [
-                    pw.TextSpan(
-                        text: '${f.label}  -  ',
-                        style: pw.TextStyle(
-                            fontSize: 8.5,
-                            fontWeight: pw.FontWeight.bold,
-                            color: _redDark)),
-                    pw.TextSpan(
-                        text: '"${f.answerText}" (${f.value}/5)',
-                        style: const pw.TextStyle(
-                            fontSize: 8.5, color: _redDark)),
-                  ])),
+                  child: pw.Row(
+                      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                      children: [
+                        pw.Container(width: 2.5, color: _red),
+                        pw.Expanded(
+                          child: pw.Container(
+                            padding: const pw.EdgeInsets.symmetric(
+                                horizontal: 9, vertical: 6),
+                            decoration: const pw.BoxDecoration(
+                              color: _redPale,
+                              borderRadius: pw.BorderRadius.only(
+                                  topRight: pw.Radius.circular(6),
+                                  bottomRight: pw.Radius.circular(6)),
+                            ),
+                            child: pw.RichText(
+                                text: pw.TextSpan(children: [
+                              pw.TextSpan(
+                                  text: '${f.label}  -  ',
+                                  style: pw.TextStyle(
+                                      fontSize: 8.5,
+                                      fontWeight: pw.FontWeight.bold,
+                                      color: _redDark)),
+                              pw.TextSpan(
+                                  text: '"${f.answerText}" (${f.value}/5)',
+                                  style: const pw.TextStyle(
+                                      fontSize: 8.5, color: _redDark)),
+                            ])),
+                          ),
+                        ),
+                      ]),
                 )),
 
           // ── TREND ──────────────────────────────────────────────
