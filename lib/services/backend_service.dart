@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../constants/zones.dart';
 import '../models/assessment_result.dart';
 
 /// ─────────────────────────────────────────────────────────────
