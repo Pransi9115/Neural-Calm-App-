@@ -162,7 +162,8 @@ class ReportScreen extends StatelessWidget {
               try {
                 await ReportPdf.share(result,
                     clientName: state.name ?? 'NeuralCalm user',
-                    email: state.email);
+                    email: state.email,
+                    history: state.history);
               } catch (_) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(

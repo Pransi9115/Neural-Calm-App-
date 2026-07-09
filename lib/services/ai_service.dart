@@ -30,7 +30,17 @@ class AiService {
   Future<String> reply(
       List<ChatMessage> conversation, AssessmentResult? latest) async {
     if (anthropicKey.isNotEmpty) return _anthropic(conversation, latest);
-    if (geminiKey.isNotEmpty) return _gemini(conversation, latest);
+    if (geminiKey.isNotEmpty) {
+      if (!geminiKey.startsWith('AIza')) {
+        return 'Setup check: the Gemini key built into this app starts with '
+            '"${geminiKey.substring(0, geminiKey.length < 4 ? geminiKey.length : 4)}..." '
+            'but real Gemini API keys always start with "AIza". Please open '
+            'aistudio.google.com -> Get API key -> Create API key, copy the '
+            'AIza... value into Codemagic -> Environment variables '
+            '(name GEMINI_API_KEY, group "keys"), then run a new build.';
+      }
+      return _gemini(conversation, latest);
+    }
     return _placeholder(latest);
   }
 
@@ -106,8 +116,9 @@ class AiService {
             'Give me a minute and ask again.';
       }
       if (res.statusCode == 400 || res.statusCode == 403) {
-        return 'My API key looks invalid — please check the Gemini key in '
-            'lib/services/ai_service.dart.';
+        return 'My Gemini key was rejected (error ${res.statusCode}). Please create '
+            'a fresh key at aistudio.google.com and update GEMINI_API_KEY in '
+            'Codemagic -> Environment variables (group "keys"), then rebuild.';
       }
       return 'I could not reach my brain just now (error ${res.statusCode}). '
           'Please try again in a moment.';
@@ -156,8 +167,8 @@ class AiService {
             : content;
       }
       if (res.statusCode == 401) {
-        return 'My API key looks invalid — please check the Anthropic key in '
-            'lib/services/ai_service.dart.';
+        return 'My Anthropic key was rejected. Please check ANTHROPIC_API_KEY in '
+            'Codemagic -> Environment variables (group "keys"), then rebuild.';
       }
       return 'I could not reach my brain just now (error ${res.statusCode}). '
           'Please try again in a moment.';
@@ -170,8 +181,10 @@ class AiService {
     final context = latest == null
         ? "Once you take your first assessment I'll tailor everything to your Neural Calm Score."
         : "I can see your latest Neural Calm Score is ${latest.overall} — ${latest.zone.label} zone.";
-    return 'Thanks for sharing. $context (My real AI is one step away — '
-        'paste a FREE Gemini key from aistudio.google.com into '
-        'lib/services/ai_service.dart and I come to life.)';
+    return 'Thanks for sharing. $context (Setup check: NO AI key was included '
+        'in this build. In Codemagic open your app -> Environment variables, '
+        'add GEMINI_API_KEY with your AIza... key from aistudio.google.com, '
+        'put it in a group named exactly "keys", tick Secure, save — then '
+        'run a NEW build.)';
   }
 }
