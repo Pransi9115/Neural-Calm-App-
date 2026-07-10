@@ -145,6 +145,13 @@ class HealthService {
     }
   }
 
+  /// Force the connected flag (used when permission state can't be
+  /// verified reliably — the dashboard's probe then shows the truth).
+  Future<void> markConnected() async {
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(_prefKey, true);
+  }
+
   Future<bool> isConnected() async {
     final p = await SharedPreferences.getInstance();
     return p.getBool(_prefKey) ?? false;

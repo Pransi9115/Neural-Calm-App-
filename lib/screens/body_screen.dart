@@ -66,18 +66,25 @@ class _BodyScreenState extends State<BodyScreen> {
     }
     final ok = await _svc.connect();
     if (!ok) {
-      if (!mounted) return;
-      setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text(
-              'Permission not granted. Open Health Connect → App permissions → NeuralCalm to allow access.')));
-      return;
+      // Health Connect sometimes reports "denied" even when access is
+      // granted (no dialog shown). Open the dashboard anyway — the
+      // per-type record counts there reveal the true state.
+      await _svc.markConnected();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            duration: Duration(seconds: 6),
+            content: Text(
+                'Could not verify permission — opening the dashboard. If every record count shows 0, re-check Health Connect → App permissions → neuralcalm.')));
+      }
     }
     final s = await _svc.fetchSummary();
+    Map<String, int>? probe;
+    if (s.isEmpty) probe = await _svc.probe();
     if (!mounted) return;
     setState(() {
       _connected = true;
       _sum = s;
+      _probe = probe;
       _loading = false;
     });
   }
