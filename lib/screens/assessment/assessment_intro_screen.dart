@@ -20,6 +20,12 @@ class AssessmentIntroScreen extends StatefulWidget {
 class _AssessmentIntroScreenState extends State<AssessmentIntroScreen> {
   Map<String, int> _progress = {};
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
   Future<void> _load() async {
     final state = context.read<AppState>();
     final p = await state.storage.loadProgress(state.auth.currentUid);

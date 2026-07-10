@@ -18,15 +18,35 @@ definitions:
         flutter create . --org com.neuralcalm --project-name neuralcalm --platforms=android,ios
         mv -f pubspec.keep.yaml pubspec.yaml
     - &android_tweaks
-      name: Android tweaks (minSdk 23 + INTERNET permission)
+      name: Android tweaks (minSdk 26 + INTERNET + Health Connect)
       script: |
         for f in android/app/build.gradle android/app/build.gradle.kts; do
-          if [ -f "$f" ]; then sed -i.bak 's/flutter.minSdkVersion/23/g' "$f"; fi
+          if [ -f "$f" ]; then sed -i.bak 's/flutter.minSdkVersion/26/g' "$f"; fi
         done
         M=android/app/src/main/AndroidManifest.xml
         if [ -f "$M" ] && ! grep -q "android.permission.INTERNET" "$M"; then
           sed -i.bak 's|<application|<uses-permission android:name="android.permission.INTERNET"/><application|' "$M"
         fi
+        python3 - <<'PYEOF'
+        import re
+        M='android/app/src/main/AndroidManifest.xml'
+        s=open(M).read()
+        perms=''.join(f'<uses-permission android:name="android.permission.health.{p}"/>' for p in
+          ['READ_STEPS','READ_SLEEP','READ_HEART_RATE','READ_RESTING_HEART_RATE','READ_HEART_RATE_VARIABILITY'])
+        if 'health.READ_STEPS' not in s:
+            s=s.replace('<application', perms+'<application',1)
+        if 'ACTION_SHOW_PERMISSIONS_RATIONALE' not in s:
+            ratio='<intent-filter><action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE"/></intent-filter>'
+            s=re.sub(r'(<activity\b[^>]*\.MainActivity.*?)</activity>', lambda m: m.group(1)+ratio+'</activity>', s, count=1, flags=re.S)
+        if 'ViewPermissionUsageActivity' not in s:
+            alias=('<activity-alias android:name="ViewPermissionUsageActivity" android:exported="true" '
+                   'android:targetActivity=".MainActivity" android:permission="android.permission.START_VIEW_PERMISSION_USAGE">'
+                   '<intent-filter><action android:name="android.intent.action.VIEW_PERMISSION_USAGE"/>'
+                   '<category android:name="android.intent.category.HEALTH_PERMISSIONS"/></intent-filter></activity-alias>')
+            s=s.replace('</application>', alias+'</application>',1)
+        open(M,'w').write(s)
+        print('Health Connect manifest entries injected')
+        PYEOF
     - &pub_get
       name: Get packages
       script: flutter pub get

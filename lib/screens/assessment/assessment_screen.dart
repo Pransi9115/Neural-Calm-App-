@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../../constants/questions.dart';
 import '../../providers/app_state.dart';
+import '../../services/health_service.dart';
 import '../../services/scoring_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_theme.dart';
@@ -62,7 +63,48 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     });
   }
 
+  // ── Biometric Data (d5) auto-fill ─────────────────────────
+  bool _autofillTried = false;
+  final Set<String> _autoKeys = {};
+
+  Future<void> _maybeAutofill() async {
+    if (_autofillTried) return;
+    final (d, _) = _order[_flatIndex];
+    if (domains[d].id != 'd5') return;
+    _autofillTried = true;
+
+    final state = context.read<AppState>();
+    final fills = <String, int>{};
+
+    // Q4 (index 3): score trend from the app's own history.
+    final trend = HealthService.answerTrend(
+        state.history.map((r) => r.overall).toList());
+    if (trend != null) fills['d5_3'] = trend;
+
+    // Q1 + Q3 from the device, only if health is connected.
+    final svc = HealthService();
+    if (await svc.isConnected()) {
+      final sum = await svc.fetchSummary();
+      final hrv = HealthService.answerHrv(sum);
+      final deep = HealthService.answerDeepSleep(sum);
+      if (hrv != null) fills['d5_0'] = hrv;
+      if (deep != null) fills['d5_2'] = deep;
+    }
+
+    if (fills.isEmpty || !mounted) return;
+    setState(() {
+      for (final e in fills.entries) {
+        if (!_answers.containsKey(e.key)) {
+          _answers[e.key] = e.value;
+          _autoKeys.add(e.key);
+        }
+      }
+    });
+    await state.storage.saveProgress(state.auth.currentUid, _answers);
+  }
+
   Future<void> _select(int value) async {
+    _autoKeys.remove(_key(_flatIndex)); // user took over
     final state = context.read<AppState>();
     setState(() => _answers[_key(_flatIndex)] = value);
     await state.storage.saveProgress(state.auth.currentUid, _answers);
@@ -127,6 +169,9 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
     final domain = domains[d];
     final question = domain.questions[q];
     final selected = _answers[_key(_flatIndex)];
+    if (domain.id == 'd5' && !_autofillTried) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _maybeAutofill());
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -173,6 +218,31 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
                   ),
                 ),
                 const SizedBox(height: 14),
+                if (_autoKeys.contains(_key(_flatIndex))) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 9),
+                    decoration: BoxDecoration(
+                      color: AppColors.purplePale,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(children: const [
+                      Icon(LucideIcons.watch,
+                          size: 15, color: AppColors.purpleDeep),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Auto-filled from your health data — you can change it.',
+                          style: TextStyle(
+                              fontSize: 11.5,
+                              color: AppColors.purpleDeep,
+                              fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ]),
+                  ),
+                  const SizedBox(height: 10),
+                ],
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
