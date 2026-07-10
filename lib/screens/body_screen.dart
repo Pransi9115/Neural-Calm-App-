@@ -22,6 +22,7 @@ class _BodyScreenState extends State<BodyScreen> {
   bool _connected = false;
   bool _needsInstall = false;
   HealthSummary _sum = const HealthSummary();
+  Map<String, int>? _probe;
 
   @override
   void initState() {
@@ -33,10 +34,13 @@ class _BodyScreenState extends State<BodyScreen> {
     final connected = await _svc.isConnected();
     if (connected) {
       final s = await _svc.fetchSummary();
+      Map<String, int>? probe;
+      if (s.isEmpty) probe = await _svc.probe();
       if (!mounted) return;
       setState(() {
         _connected = true;
         _sum = s;
+        _probe = probe;
         _loading = false;
       });
     } else {
@@ -80,8 +84,13 @@ class _BodyScreenState extends State<BodyScreen> {
 
   Future<void> _refresh() async {
     final s = await _svc.fetchSummary();
+    Map<String, int>? probe;
+    if (s.isEmpty) probe = await _svc.probe();
     if (!mounted) return;
-    setState(() => _sum = s);
+    setState(() {
+      _sum = s;
+      _probe = probe;
+    });
   }
 
   @override
@@ -151,11 +160,29 @@ class _BodyScreenState extends State<BodyScreen> {
           _card(
             icon: LucideIcons.info,
             title: 'Connected — waiting for data',
-            child: const Text(
-              'No readings found yet. Make sure your band\'s app (BMH Healthband, Zepp, Mi Fitness…) is set to sync with Health Connect, then pull down to refresh.',
-              style: TextStyle(
-                  fontSize: 12.5, color: AppColors.muted, height: 1.5),
-            ),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Permission is fine — but Health Connect returned no readings. Make sure your band\'s app (BMH Healthband, Zepp, Mi Fitness…) is switched on to sync WITH Health Connect, then pull down to refresh.',
+                    style: TextStyle(
+                        fontSize: 12.5, color: AppColors.muted, height: 1.5),
+                  ),
+                  if (_probe != null) ...[
+                    const SizedBox(height: 8),
+                    Text('RECORDS FOUND (LAST 7 DAYS)', style: secLabel()),
+                    const SizedBox(height: 4),
+                    Text(
+                      _probe!.entries
+                          .map((e) => '${e.key}: ${e.value}')
+                          .join(' · '),
+                      style: const TextStyle(
+                          fontSize: 10.5,
+                          color: AppColors.muted,
+                          height: 1.6),
+                    ),
+                  ],
+                ]),
           ),
         _metricCard(
           icon: LucideIcons.footprints,
@@ -197,6 +224,44 @@ class _BodyScreenState extends State<BodyScreen> {
                   ? AppColors.green
                   : AppColors.red,
         ),
+        if (s.spo2 != null)
+          _metricCard(
+            icon: LucideIcons.droplets,
+            label: 'BLOOD OXYGEN (SPO2)',
+            value: '${s.spo2!.toStringAsFixed(0)}%',
+            sub: 'Latest reading',
+          ),
+        if (s.distanceKm != null)
+          _metricCard(
+            icon: LucideIcons.route,
+            label: 'DISTANCE TODAY',
+            value: '${s.distanceKm!.toStringAsFixed(2)} km',
+          ),
+        if (s.kcalActive != null || s.kcalTotal != null)
+          _metricCard(
+            icon: LucideIcons.flame,
+            label: 'CALORIES TODAY',
+            value: s.kcalTotal != null
+                ? '${s.kcalTotal!.toStringAsFixed(0)} kcal'
+                : '${s.kcalActive!.toStringAsFixed(0)} kcal',
+            sub: s.kcalActive != null && s.kcalTotal != null
+                ? '${s.kcalActive!.toStringAsFixed(0)} kcal active'
+                : (s.kcalTotal != null ? 'Total burn' : 'Active burn'),
+          ),
+        if (s.bpSys != null)
+          _metricCard(
+            icon: LucideIcons.gauge,
+            label: 'BLOOD PRESSURE',
+            value: '${s.bpSys}/${s.bpDia ?? '—'}',
+            sub: 'Latest reading (mmHg)',
+          ),
+        if (s.tempC != null)
+          _metricCard(
+            icon: LucideIcons.thermometer,
+            label: 'BODY TEMPERATURE',
+            value: '${s.tempC!.toStringAsFixed(1)} °C',
+            sub: 'Latest reading',
+          ),
         const SizedBox(height: 6),
         _card(
           icon: LucideIcons.clipboardCheck,

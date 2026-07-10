@@ -23,9 +23,16 @@ class HealthSummary {
   final int? steps; // today
   final double? sleepHours; // last night, total asleep
   final double? deepPct7d; // avg deep-sleep % over last 7 days
-  final int? restingHeartRate; // most recent
+  final int? restingHeartRate; // written value, or computed from HR stream
   final double? hrv7d; // avg RMSSD last 7 days (ms)
   final double? hrvBaseline; // avg RMSSD previous 30 days (ms)
+  final double? spo2; // latest %, last 7 days
+  final double? distanceKm; // today
+  final double? kcalActive; // today
+  final double? kcalTotal; // today
+  final double? tempC; // latest, last 7 days
+  final int? bpSys; // latest, last 7 days
+  final int? bpDia;
 
   const HealthSummary({
     this.steps,
@@ -34,6 +41,13 @@ class HealthSummary {
     this.restingHeartRate,
     this.hrv7d,
     this.hrvBaseline,
+    this.spo2,
+    this.distanceKm,
+    this.kcalActive,
+    this.kcalTotal,
+    this.tempC,
+    this.bpSys,
+    this.bpDia,
   });
 
   bool get isEmpty =>
@@ -41,7 +55,13 @@ class HealthSummary {
       sleepHours == null &&
       deepPct7d == null &&
       restingHeartRate == null &&
-      hrv7d == null;
+      hrv7d == null &&
+      spo2 == null &&
+      distanceKm == null &&
+      kcalActive == null &&
+      kcalTotal == null &&
+      tempC == null &&
+      bpSys == null;
 
   /// % change of recent HRV vs baseline (positive = above baseline).
   double? get hrvDeltaPct {
@@ -64,6 +84,13 @@ class HealthService {
     HealthDataType.HEART_RATE,
     HealthDataType.RESTING_HEART_RATE,
     HealthDataType.HEART_RATE_VARIABILITY_RMSSD,
+    HealthDataType.BLOOD_OXYGEN,
+    HealthDataType.DISTANCE_DELTA,
+    HealthDataType.ACTIVE_ENERGY_BURNED,
+    HealthDataType.TOTAL_CALORIES_BURNED,
+    HealthDataType.BODY_TEMPERATURE,
+    HealthDataType.BLOOD_PRESSURE_SYSTOLIC,
+    HealthDataType.BLOOD_PRESSURE_DIASTOLIC,
   ];
 
   Future<void> _configure() async {
@@ -91,19 +118,28 @@ class HealthService {
   }
 
   /// Ask the user for read permission on all our data types.
+  /// Health Connect quirk: if permission was ALREADY granted, the
+  /// request shows no dialog and can report false — so the granted
+  /// state (hasPermissions) is always the source of truth.
   Future<bool> connect() async {
     try {
       await _configure();
-      final ok = await _health.requestAuthorization(
-        _types,
-        permissions:
-            List.filled(_types.length, HealthDataAccess.READ),
-      );
-      if (ok) {
+      final perms = List.filled(_types.length, HealthDataAccess.READ);
+
+      bool granted =
+          (await _health.hasPermissions(_types, permissions: perms)) == true;
+      if (!granted) {
+        final asked = await _health.requestAuthorization(_types,
+            permissions: perms);
+        granted = asked ||
+            (await _health.hasPermissions(_types, permissions: perms)) ==
+                true;
+      }
+      if (granted) {
         final p = await SharedPreferences.getInstance();
         await p.setBool(_prefKey, true);
       }
-      return ok;
+      return granted;
     } catch (_) {
       return false;
     }
@@ -230,6 +266,74 @@ class HealthService {
       hrvBase = hrvOld.map(_num).reduce((a, b) => a + b) / hrvOld.length;
     }
 
+    // Resting HR fallback: 5th-percentile of raw heart-rate readings
+    // over the last 7 days (bands that don't write RESTING_HEART_RATE).
+    if (restingHr == null) {
+      final hr = await _fetch([HealthDataType.HEART_RATE],
+          now.subtract(const Duration(days: 7)), now);
+      if (hr.length >= 20) {
+        final vals = hr.map(_num).toList()..sort();
+        restingHr = vals[(vals.length * 0.05).floor()].round();
+      }
+    }
+
+    final dayStart = DateTime(now.year, now.month, now.day);
+
+    // SpO2 — latest in 7 days
+    double? spo2;
+    final ox = await _fetch([HealthDataType.BLOOD_OXYGEN],
+        now.subtract(const Duration(days: 7)), now);
+    if (ox.isNotEmpty) {
+      ox.sort((a, b) => a.dateTo.compareTo(b.dateTo));
+      spo2 = _num(ox.last);
+      if (spo2 <= 1.5) spo2 *= 100; // some sources store 0–1
+    }
+
+    // Distance today (metres → km)
+    double? distanceKm;
+    final dist =
+        await _fetch([HealthDataType.DISTANCE_DELTA], dayStart, now);
+    if (dist.isNotEmpty) {
+      distanceKm = dist.map(_num).reduce((a, b) => a + b) / 1000.0;
+    }
+
+    // Calories today
+    double? kcalActive, kcalTotal;
+    final act =
+        await _fetch([HealthDataType.ACTIVE_ENERGY_BURNED], dayStart, now);
+    if (act.isNotEmpty) {
+      kcalActive = act.map(_num).reduce((a, b) => a + b);
+    }
+    final tot =
+        await _fetch([HealthDataType.TOTAL_CALORIES_BURNED], dayStart, now);
+    if (tot.isNotEmpty) {
+      kcalTotal = tot.map(_num).reduce((a, b) => a + b);
+    }
+
+    // Body temperature — latest in 7 days
+    double? tempC;
+    final temp = await _fetch([HealthDataType.BODY_TEMPERATURE],
+        now.subtract(const Duration(days: 7)), now);
+    if (temp.isNotEmpty) {
+      temp.sort((a, b) => a.dateTo.compareTo(b.dateTo));
+      tempC = _num(temp.last);
+    }
+
+    // Blood pressure — latest in 7 days
+    int? bpSys, bpDia;
+    final sys = await _fetch([HealthDataType.BLOOD_PRESSURE_SYSTOLIC],
+        now.subtract(const Duration(days: 7)), now);
+    if (sys.isNotEmpty) {
+      sys.sort((a, b) => a.dateTo.compareTo(b.dateTo));
+      bpSys = _num(sys.last).round();
+    }
+    final dia = await _fetch([HealthDataType.BLOOD_PRESSURE_DIASTOLIC],
+        now.subtract(const Duration(days: 7)), now);
+    if (dia.isNotEmpty) {
+      dia.sort((a, b) => a.dateTo.compareTo(b.dateTo));
+      bpDia = _num(dia.last).round();
+    }
+
     return HealthSummary(
       steps: steps,
       sleepHours: sleepHours,
@@ -237,7 +341,29 @@ class HealthService {
       restingHeartRate: restingHr,
       hrv7d: hrv7,
       hrvBaseline: hrvBase,
+      spo2: spo2,
+      distanceKm: distanceKm,
+      kcalActive: kcalActive,
+      kcalTotal: kcalTotal,
+      tempC: tempC,
+      bpSys: bpSys,
+      bpDia: bpDia,
     );
+  }
+
+  /// Diagnostic: how many records exist per type in the last 7 days.
+  /// Shown in the Body tab when everything is empty, so we can see
+  /// whether Health Connect itself has any data to read.
+  Future<Map<String, int>> probe() async {
+    await _configure();
+    final now = DateTime.now();
+    final from = now.subtract(const Duration(days: 7));
+    final out = <String, int>{};
+    for (final t in _types) {
+      final d = await _fetch([t], from, now);
+      out[t.name] = d.length;
+    }
+    return out;
   }
 
   // ── Assessment auto-fill (answer values 0–4) ────────────────

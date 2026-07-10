@@ -32,7 +32,7 @@ definitions:
         M='android/app/src/main/AndroidManifest.xml'
         s=open(M).read()
         perms=''.join(f'<uses-permission android:name="android.permission.health.{p}"/>' for p in
-          ['READ_STEPS','READ_SLEEP','READ_HEART_RATE','READ_RESTING_HEART_RATE','READ_HEART_RATE_VARIABILITY'])
+          ['READ_STEPS','READ_SLEEP','READ_HEART_RATE','READ_RESTING_HEART_RATE','READ_HEART_RATE_VARIABILITY','READ_OXYGEN_SATURATION','READ_DISTANCE','READ_ACTIVE_CALORIES_BURNED','READ_TOTAL_CALORIES_BURNED','READ_BODY_TEMPERATURE','READ_BLOOD_PRESSURE'])
         if 'health.READ_STEPS' not in s:
             s=s.replace('<application', perms+'<application',1)
         if 'ACTION_SHOW_PERMISSIONS_RATIONALE' not in s:
