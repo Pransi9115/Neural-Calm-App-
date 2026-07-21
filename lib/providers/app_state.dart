@@ -16,6 +16,7 @@ class AppState extends ChangeNotifier {
   String? email;
   String? name;
   bool marcusTyping = false;
+
   AssessmentResult? latestResult;
   final List<AssessmentResult> history = [];
   final List<ChatMessage> messages = [];
@@ -42,13 +43,28 @@ class AppState extends ChangeNotifier {
 
   Future<String?> signUp(String fullName, String emailAddr, String password) async {
     final err = await auth.signUp(fullName.trim(), emailAddr.trim(), password);
-    if (err == null) await _afterAuth();
+    if (err == null) {
+      await _afterAuth();
+      _backend.logLogin(
+        uid: auth.currentUid,
+        name: auth.currentName ?? fullName.trim(),
+        email: auth.currentEmail ?? emailAddr.trim(),
+        isSignup: true,
+      );
+    }
     return err;
   }
 
   Future<String?> signIn(String emailAddr, String password) async {
     final err = await auth.signIn(emailAddr.trim(), password);
-    if (err == null) await _afterAuth();
+    if (err == null) {
+      await _afterAuth();
+      _backend.logLogin(
+        uid: auth.currentUid,
+        name: auth.currentName ?? '',
+        email: auth.currentEmail ?? emailAddr.trim(),
+      );
+    }
     return err;
   }
 
@@ -85,12 +101,31 @@ class AppState extends ChangeNotifier {
 
   Future<void> sendMessage(String text) async {
     if (text.trim().isEmpty || marcusTyping) return;
-    messages.add(ChatMessage(text: text.trim(), fromUser: true));
+    final userMsg = ChatMessage(text: text.trim(), fromUser: true);
+    messages.add(userMsg);
     marcusTyping = true;
     notifyListeners();
+    _backend.saveChat(
+      uid: auth.currentUid,
+      name: name ?? '',
+      email: email ?? '',
+      message: userMsg.text,
+      fromUser: true,
+      sentAt: userMsg.sentAt,
+    );
+
     final reply = await _ai.reply(List.of(messages), latestResult);
     marcusTyping = false;
-    messages.add(ChatMessage(text: reply, fromUser: false));
+    final aiMsg = ChatMessage(text: reply, fromUser: false);
+    messages.add(aiMsg);
     notifyListeners();
+    _backend.saveChat(
+      uid: auth.currentUid,
+      name: name ?? '',
+      email: email ?? '',
+      message: aiMsg.text,
+      fromUser: false,
+      sentAt: aiMsg.sentAt,
+    );
   }
 }

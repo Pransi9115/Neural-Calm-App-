@@ -1,3 +1,5 @@
+static const String backendUrl = 'http://192.168.31.114/api';   // ← YOUR IP from ipconfig
+static const String apiKey = 'NC-test-key-2026-abc123xyz';   // ← EXACTLY as in config.php
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../constants/zones.dart';
