@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:http/http.dart' as http;
+import '../constants/zones.dart';
 import '../models/assessment_result.dart';
 
 /// ─────────────────────────────────────────────────────────────
