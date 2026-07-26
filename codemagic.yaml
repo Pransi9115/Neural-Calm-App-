@@ -119,3 +119,56 @@ workflows:
         script: flutter build ios --release --no-codesign --dart-define=GEMINI_API_KEY=$GEMINI_API_KEY --dart-define=ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
     artifacts:
       - build/ios/iphoneos/*.app
+
+  # 4) Start manually. Builds a SIGNED IPA and uploads it to TestFlight.
+  #    Requires, before the first run:
+  #      - App Store Connect API key added in Codemagic under the
+  #        integration name "NeuralCalm ASC Key"
+  #      - App record in App Store Connect with bundle ID
+  #        com.neuralcalm.neuralcalm
+  ios-testflight:
+    name: iOS TestFlight (signed)
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+
+    integrations:
+      app_store_connect: NeuralCalm ASC Key
+
+    environment:
+      flutter: stable
+      groups:
+        - keys
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.neuralcalm.neuralcalm
+
+    scripts:
+      # NOTE: android_tweaks is deliberately NOT used here (Android only).
+      - *create_platforms
+      - *pub_get
+      - *launcher_icons
+
+      - name: Set up code signing
+        script: |
+          xcode-project use-profiles
+
+      - name: Set a unique build number
+        script: |
+          cd $CM_BUILD_DIR/ios
+          agvtool new-version -all $(($BUILD_NUMBER + 100))
+
+      - name: Build signed IPA
+        script: |
+          flutter build ipa --release \
+            --dart-define=GEMINI_API_KEY=$GEMINI_API_KEY \
+            --dart-define=ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
+            --export-options-plist=/Users/builder/export_options.plist
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
