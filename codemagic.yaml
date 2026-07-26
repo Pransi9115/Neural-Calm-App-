@@ -40,6 +40,37 @@ definitions:
         open(M,'w').write(s)
         print('Health Connect manifest entries injected')
         PYEOF
+    # iOS needs a minimum deployment target of 15.0 because the
+    # Firebase iOS SDK requires it. flutter create defaults to 13.0,
+    # and the ios/ folder is regenerated on every build, so this
+    # must run as a script each time.
+    - &ios_tweaks
+      name: iOS tweaks (deployment target 15.0)
+      script: |
+        python3 - <<'PYEOF'
+        import re, os
+        P = 'ios/Runner.xcodeproj/project.pbxproj'
+        s = open(P).read()
+        s = re.sub(r'IPHONEOS_DEPLOYMENT_TARGET = [0-9.]+;',
+                   'IPHONEOS_DEPLOYMENT_TARGET = 15.0;', s)
+        open(P, 'w').write(s)
+        print('Xcode deployment target set to 15.0')
+
+        F = 'ios/Podfile'
+        if os.path.exists(F):
+            lines = open(F).read().split('\n')
+            out, done = [], False
+            for ln in lines:
+                if 'platform :ios' in ln and not done:
+                    out.append("platform :ios, '15.0'")
+                    done = True
+                else:
+                    out.append(ln)
+            if not done:
+                out.insert(0, "platform :ios, '15.0'")
+            open(F, 'w').write('\n'.join(out))
+            print('Podfile platform set to 15.0')
+        PYEOF
     - &pub_get
       name: Get packages
       script: flutter pub get
@@ -99,6 +130,7 @@ workflows:
         - keys
     scripts:
       - *create_platforms
+      - *ios_tweaks
       - *pub_get
       - *launcher_icons
       - name: Build iOS (unsigned)
@@ -120,6 +152,7 @@ workflows:
         BUNDLE_ID: "com.neuralcalm.neuralcalm"
     scripts:
       - *create_platforms
+      - *ios_tweaks
       - *pub_get
       - *launcher_icons
       - name: Set up keychain
