@@ -10,8 +10,8 @@ import '../models/assessment_result.dart';
 /// 'https://yourdomain.com/api' and use the live API key.
 /// ─────────────────────────────────────────────────────────────
 class BackendService {
-  static const String backendUrl = 'http://192.168.31.114/api';
-  static const String apiKey = 'NC-test-key-2026-abc123xyz';
+  static const String backendUrl = 'https://neuralcalmtest.com/api';
+static const String apiKey = 'NC-TgwUQPJrRCciEapzs3rOIvV0e8vRgKEMq1SjMqEe94eMjztQ';
 
   Map<String, String> get _headers => {
         'content-type': 'application/json',
