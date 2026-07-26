@@ -1,12 +1,5 @@
 # ─────────────────────────────────────────────────────────────
 # NeuralCalm — cloud builds, no local Flutter needed.
-#
-# The repo ships only lib/ + assets/ + pubspec.yaml. Each build:
-#  1. generates the android/ and ios/ native folders,
-#  2. applies required Android tweaks (minSdk 23 for Firebase,
-#     INTERNET permission for release builds),
-#  3. generates the app launcher icon from assets/icon/app_icon.png,
-#  4. builds.
 # ─────────────────────────────────────────────────────────────
 
 definitions:
@@ -56,7 +49,6 @@ definitions:
 
 workflows:
 
-  # 1) Runs automatically on every push to main → debug APK for your phone.
   android-debug:
     name: Android debug APK
     max_build_duration: 60
@@ -80,9 +72,6 @@ workflows:
     artifacts:
       - build/app/outputs/flutter-apk/app-debug.apk
 
-  # 2) Start manually when we reach Play Store prep.
-  #    Before first store upload: add your keystore in
-  #    Codemagic → Code signing identities, then attach it here.
   android-release:
     name: Android release AAB (Play Store - manual)
     max_build_duration: 60
@@ -100,9 +89,6 @@ workflows:
     artifacts:
       - build/app/outputs/bundle/release/*.aab
 
-  # 3) Start manually. Verifies the iOS build compiles (Codemagic
-  #    machines are Macs). Device installs / App Store need your
-  #    Apple Developer account connected — done at store-prep time.
   ios-verify:
     name: iOS build check (unsigned - manual)
     max_build_duration: 60
@@ -120,54 +106,37 @@ workflows:
     artifacts:
       - build/ios/iphoneos/*.app
 
-  # 4) Start manually. Builds a SIGNED IPA and uploads it to TestFlight.
-  #    Requires, before the first run:
-  #      - App Store Connect API key added in Codemagic under the
-  #        integration name "NeuralCalm ASC Key"
-  #      - App record in App Store Connect with bundle ID
-  #        com.neuralcalm.neuralcalm
   ios-testflight:
     name: iOS TestFlight (signed)
     max_build_duration: 120
     instance_type: mac_mini_m2
-
     integrations:
       app_store_connect: NeuralCalm ASC Key
-
     environment:
       flutter: stable
       groups:
         - keys
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.neuralcalm.neuralcalm
-
+      vars:
+        BUNDLE_ID: "com.neuralcalm.neuralcalm"
     scripts:
-      # NOTE: android_tweaks is deliberately NOT used here (Android only).
       - *create_platforms
       - *pub_get
       - *launcher_icons
-
-      - name: Set up code signing
-        script: |
-          xcode-project use-profiles
-
+      - name: Set up keychain
+        script: keychain initialize
+      - name: Fetch or create signing files
+        script: app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
+      - name: Add certificates to keychain
+        script: keychain add-certificates
+      - name: Apply provisioning profiles
+        script: xcode-project use-profiles
       - name: Set a unique build number
-        script: |
-          cd $CM_BUILD_DIR/ios
-          agvtool new-version -all $(($BUILD_NUMBER + 100))
-
+        script: cd $CM_BUILD_DIR/ios && agvtool new-version -all $(($BUILD_NUMBER + 100))
       - name: Build signed IPA
-        script: |
-          flutter build ipa --release \
-            --dart-define=GEMINI_API_KEY=$GEMINI_API_KEY \
-            --dart-define=ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
-            --export-options-plist=/Users/builder/export_options.plist
-
+        script: flutter build ipa --release --dart-define=GEMINI_API_KEY=$GEMINI_API_KEY --dart-define=ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY --export-options-plist=/Users/builder/export_options.plist
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
-
     publishing:
       app_store_connect:
         auth: integration
