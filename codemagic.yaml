@@ -40,36 +40,65 @@ definitions:
         open(M,'w').write(s)
         print('Health Connect manifest entries injected')
         PYEOF
-    # iOS needs a minimum deployment target of 15.0 because the
-    # Firebase iOS SDK requires it. flutter create defaults to 13.0,
-    # and the ios/ folder is regenerated on every build, so this
-    # must run as a script each time.
+    # iOS: deployment target 15.0 (Firebase needs it), HealthKit
+    # entitlement + Info.plist purpose strings (the health plugin
+    # links HealthKit, and Apple rejects binaries without these),
+    # and encryption compliance so TestFlight does not prompt.
     - &ios_tweaks
-      name: iOS tweaks (deployment target 15.0)
+      name: iOS tweaks (target 15.0 + HealthKit + purpose strings)
       script: |
         python3 - <<'PYEOF'
         import re, os
-        P = 'ios/Runner.xcodeproj/project.pbxproj'
+
+        BUNDLE = 'com.neuralcalm.neuralcalm'
+        P  = 'ios/Runner.xcodeproj/project.pbxproj'
+        IP = 'ios/Runner/Info.plist'
+        EN = 'ios/Runner/Runner.entitlements'
+
+        # 1. deployment target -> 15.0
         s = open(P).read()
         s = re.sub(r'IPHONEOS_DEPLOYMENT_TARGET = [0-9.]+;',
                    'IPHONEOS_DEPLOYMENT_TARGET = 15.0;', s)
-        open(P, 'w').write(s)
-        print('Xcode deployment target set to 15.0')
 
-        F = 'ios/Podfile'
-        if os.path.exists(F):
-            lines = open(F).read().split('\n')
-            out, done = [], False
-            for ln in lines:
-                if 'platform :ios' in ln and not done:
-                    out.append("platform :ios, '15.0'")
-                    done = True
-                else:
-                    out.append(ln)
-            if not done:
-                out.insert(0, "platform :ios, '15.0'")
-            open(F, 'w').write('\n'.join(out))
-            print('Podfile platform set to 15.0')
+        # 2. point the target at an entitlements file
+        if 'CODE_SIGN_ENTITLEMENTS' not in s:
+            s = s.replace(
+                'PRODUCT_BUNDLE_IDENTIFIER = %s;' % BUNDLE,
+                'CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;\n\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = %s;' % BUNDLE)
+        open(P, 'w').write(s)
+        print('pbxproj: deployment target 15.0 + entitlements wired')
+
+        # 3. write the entitlements file (HealthKit)
+        open(EN, 'w').write(
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
+            '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+            '<plist version="1.0">\n<dict>\n'
+            '\t<key>com.apple.developer.healthkit</key>\n\t<true/>\n'
+            '\t<key>com.apple.developer.healthkit.access</key>\n\t<array/>\n'
+            '</dict>\n</plist>\n')
+        print('Runner.entitlements written (HealthKit)')
+
+        # 4. Info.plist purpose strings + encryption compliance
+        s = open(IP).read()
+        adds = {
+          'NSHealthShareUsageDescription':
+            'Neural Calm reads heart rate, heart-rate variability and sleep '
+            'data from Apple Health so your Calm Score reflects your own body.',
+          'NSHealthUpdateUsageDescription':
+            'Neural Calm can save your wellbeing readings back to Apple Health.',
+        }
+        extra = ''
+        for k, v in adds.items():
+            if k not in s:
+                extra += '\t<key>%s</key>\n\t<string>%s</string>\n' % (k, v)
+        if 'ITSAppUsesNonExemptEncryption' not in s:
+            extra += '\t<key>ITSAppUsesNonExemptEncryption</key>\n\t<false/>\n'
+        if extra:
+            i = s.rindex('</dict>')
+            s = s[:i] + extra + s[i:]
+            open(IP, 'w').write(s)
+        print('Info.plist: purpose strings + encryption compliance added')
         PYEOF
     - &pub_get
       name: Get packages
@@ -164,7 +193,7 @@ workflows:
       - name: Apply provisioning profiles
         script: xcode-project use-profiles
       - name: Set a unique build number
-        script: cd $CM_BUILD_DIR/ios && agvtool new-version -all $(($BUILD_NUMBER + 100))
+        script: cd $CM_BUILD_DIR/ios && agvtool new-version -all $(($BUILD_NUMBER + 200))
       - name: Build signed IPA
         script: flutter build ipa --release --dart-define=GEMINI_API_KEY=$GEMINI_API_KEY --dart-define=ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY --export-options-plist=/Users/builder/export_options.plist
     artifacts:
