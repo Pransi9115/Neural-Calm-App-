@@ -16,6 +16,10 @@ definitions:
         for f in android/app/build.gradle android/app/build.gradle.kts; do
           if [ -f "$f" ]; then sed -i.bak 's/flutter.minSdkVersion/26/g' "$f"; fi
         done
+        for f in $(find android -name MainActivity.kt -o -name MainActivity.java); do
+          sed -i.bak 's/FlutterActivity/FlutterFragmentActivity/g' "$f"
+          echo "patched $f -> FlutterFragmentActivity"
+        done
         M=android/app/src/main/AndroidManifest.xml
         if [ -f "$M" ] && ! grep -q "android.permission.INTERNET" "$M"; then
           sed -i.bak 's|<application|<uses-permission android:name="android.permission.INTERNET"/><application|' "$M"
@@ -25,7 +29,9 @@ definitions:
         M='android/app/src/main/AndroidManifest.xml'
         s=open(M).read()
         perms=''.join(f'<uses-permission android:name="android.permission.health.{p}"/>' for p in
-          ['READ_STEPS','READ_SLEEP','READ_HEART_RATE','READ_RESTING_HEART_RATE','READ_HEART_RATE_VARIABILITY','READ_OXYGEN_SATURATION','READ_DISTANCE','READ_ACTIVE_CALORIES_BURNED','READ_TOTAL_CALORIES_BURNED','READ_BODY_TEMPERATURE','READ_BLOOD_PRESSURE'])
+          ['READ_STEPS','READ_SLEEP','READ_HEART_RATE','READ_RESTING_HEART_RATE','READ_HEART_RATE_VARIABILITY','READ_OXYGEN_SATURATION','READ_DISTANCE','READ_ACTIVE_CALORIES_BURNED','READ_TOTAL_CALORIES_BURNED','READ_BODY_TEMPERATURE','READ_BLOOD_PRESSURE','READ_HEALTH_DATA_HISTORY'])
+        perms+='<uses-permission android:name="android.permission.ACTIVITY_RECOGNITION"/>'
+        perms+='<queries><package android:name="com.google.android.apps.healthdata"/><intent><action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE"/></intent></queries>'
         if 'health.READ_STEPS' not in s:
             s=s.replace('<application', perms+'<application',1)
         if 'ACTION_SHOW_PERMISSIONS_RATIONALE' not in s:
