@@ -103,7 +103,7 @@ class _BodyScreenState extends State<BodyScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Body'), actions: [
+      appBar: AppBar(title: const Text('Monitoring'), actions: [
         if (_connected)
           IconButton(
               onPressed: _refresh,

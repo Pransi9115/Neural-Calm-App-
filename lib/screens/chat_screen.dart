@@ -48,7 +48,7 @@ class _ChatScreenState extends State<ChatScreen> {
         title: Row(children: const [
           GlyphLogo(size: 26),
           SizedBox(width: 10),
-          Text('Marcus'),
+          Text('Calm Coach'),
         ]),
         actions: const [
           Padding(
@@ -68,7 +68,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     child: Padding(
                       padding: EdgeInsets.symmetric(horizontal: 40),
                       child: Text(
-                        "Hi, I'm Marcus. Ask me anything about your score, stress, sleep, or how to feel calmer.",
+                        "Hi, I'm your Calm Coach. Ask me anything about your score, stress, sleep, or how to feel calmer.",
                         textAlign: TextAlign.center,
                         style: TextStyle(
                             color: AppColors.muted, height: 1.5),
@@ -104,7 +104,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                         color: AppColors.purple),
                                   ),
                                   SizedBox(width: 9),
-                                  Text('Marcus is thinking…',
+                                  Text('Calm Coach is thinking…',
                                       style: TextStyle(
                                           color: AppColors.muted,
                                           fontSize: 12.5)),
@@ -160,7 +160,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   controller: _ctrl,
                   onSubmitted: (_) => _send(),
                   decoration: InputDecoration(
-                    hintText: 'Message Marcus…',
+                    hintText: 'Message Calm Coach…',
                     hintStyle: const TextStyle(
                         color: AppColors.muted, fontSize: 13.5),
                     filled: true,

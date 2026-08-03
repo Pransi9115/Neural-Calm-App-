@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/calm_nav_bar.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../../constants/questions.dart';
@@ -191,6 +192,7 @@ class _AssessmentScreenState extends State<AssessmentScreen> {
           ),
         ],
       ),
+      bottomNavigationBar: const CalmNavBar(),
       body: SafeArea(
         child: Column(children: [
           Expanded(

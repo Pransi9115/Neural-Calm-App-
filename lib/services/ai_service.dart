@@ -5,7 +5,7 @@ import '../models/assessment_result.dart';
 import '../models/chat_message.dart';
 
 /// ─────────────────────────────────────────────────────────────
-/// Marcus's AI — supports TWO providers. Fill in ONE key:
+/// Calm Coach's AI — supports TWO providers. Fill in ONE key:
 ///
 /// Keys are NEVER stored in this code (GitHub blocks that, rightly).
 /// They live in Codemagic → your app → Settings → Environment
@@ -13,7 +13,7 @@ import '../models/chat_message.dart';
 ///   GEMINI_API_KEY    → free trial via aistudio.google.com
 ///   ANTHROPIC_API_KEY → production via console.anthropic.com
 /// codemagic.yaml injects them at build time with --dart-define.
-/// If both are set, Anthropic is used. If neither, Marcus uses
+/// If both are set, Anthropic is used. If neither, Calm Coach uses
 /// friendly placeholder replies.
 ///
 /// SECURITY: even injected keys ship inside the APK and can be
@@ -44,7 +44,7 @@ class AiService {
             'Zone: ${latest.zone.label} (Optimal 0-35, Moderate 36-60, Elevated 61-100). '
             'Domain scores (0-100, lower = calmer): '
             '${latest.domainScores.entries.map((e) => '${e.key} ${e.value}').join(', ')}.';
-    return 'You are Marcus, the warm, encouraging wellbeing companion inside the '
+    return 'You are Calm Coach, the warm, encouraging wellbeing companion inside the '
         'NeuralCalm app. Keep replies short (2-5 sentences), practical and kind. '
         'Base advice on the user\'s data when relevant, and remember the scale: '
         'a LOWER Neural Calm Score is better. $scoreContext '

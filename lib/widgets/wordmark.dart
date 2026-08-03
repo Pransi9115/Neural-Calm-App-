@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
-import '../theme/app_theme.dart';
 
 /// The circular logo glyph — purple disc, white pulse mark.
 class GlyphLogo extends StatelessWidget {
@@ -45,8 +44,13 @@ class GlyphLogo extends StatelessWidget {
   }
 }
 
-/// The NeuralCalm™ wordmark: white "Neural" + purple "Calm".
-/// Always place on navy (top bar, hero band, letterhead).
+/// The Neural Calm wordmark.
+///
+/// Now renders the supplied brand PNG (assets/logo/neural-calm.png)
+/// instead of drawing the name with text styles.
+///
+/// [fontSize] is kept so existing call sites still compile — it sets
+/// the rendered height (the artwork is 220x70, so height drives width).
 class Wordmark extends StatelessWidget {
   final double fontSize;
   final bool withGlyph;
@@ -54,29 +58,11 @@ class Wordmark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = Text.rich(TextSpan(children: [
-      TextSpan(
-          text: 'Neural',
-          style: cormorant(
-              size: fontSize, weight: FontWeight.w700, color: Colors.white)),
-      TextSpan(
-          text: 'Calm',
-          style: cormorant(
-              size: fontSize,
-              weight: FontWeight.w700,
-              color: AppColors.purpleLight)),
-      TextSpan(
-          text: '™',
-          style: TextStyle(
-              fontSize: fontSize * 0.42,
-              color: Colors.white,
-              fontWeight: FontWeight.w600)),
-    ]));
-    if (!withGlyph) return text;
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      GlyphLogo(size: fontSize * 1.35),
-      SizedBox(width: fontSize * 0.42),
-      text,
-    ]);
+    return Image.asset(
+      'assets/logo/neural-calm.png',
+      height: fontSize * 1.9,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.high,
+    );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/calm_nav_bar.dart';
 import 'package:provider/provider.dart';
 import '../../constants/zones.dart';
 import '../../models/assessment_result.dart';
@@ -48,6 +49,7 @@ class ReportScreen extends StatelessWidget {
           ),
         ],
       ),
+      bottomNavigationBar: const CalmNavBar(),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

@@ -50,7 +50,7 @@ static const String apiKey = 'NC-TgwUQPJrRCciEapzs3rOIvV0e8vRgKEMq1SjMqEe94eMjzt
     }
   }
 
-  /// Called after every chat message (user's AND Marcus's reply) so the
+  /// Called after every chat message (user's AND Calm Coach's reply) so the
   /// full conversation is visible in the admin dashboard.
   Future<void> saveChat({
     required String uid,

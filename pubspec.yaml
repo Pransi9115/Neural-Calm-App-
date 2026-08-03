@@ -1,7 +1,7 @@
 name: neuralcalm
 description: NeuralCalm - measure, understand, and improve your Neural Calm Score.
 publish_to: 'none'
-version: 0.5.0+5
+version: 0.5.0+7
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -9,18 +9,15 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  provider: ^6.1.2              # state management
-  google_fonts: ^6.2.1          # Cormorant Garamond + Outfit (backend fonts)
-  lucide_icons_flutter: ^3.1.14 # outlined icons
-  shared_preferences: ^2.3.0    # history + assessment resume, per account
-  http: ^1.2.0                  # Marcus AI + PHP backend sync
+  provider: ^6.1.2
+  google_fonts: ^6.2.1
+  lucide_icons_flutter: ^3.1.14
+  shared_preferences: ^2.3.0
+  http: ^1.2.0
   firebase_core: ">=3.6.0 <5.0.0"
   firebase_auth: ">=5.3.0 <7.0.0"
-  pdf: ^3.10.0                  # professional report PDF
-  printing: ^5.12.0             # native share sheet for the PDF
-
-  # ── NEXT STEP (device health data) — one API for BOTH
-  #    Apple HealthKit and Google Health Connect:
+  pdf: ^3.10.0
+  printing: ^5.12.0
   health: 11.1.1
 
 dev_dependencies:
@@ -28,19 +25,16 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^4.0.0
   flutter_launcher_icons: ">=0.13.1 <0.15.0"
+  change_app_package_name: ^1.5.0
 
 flutter:
   uses-material-design: true
   assets:
     - assets/icon/
-      assets/logo/
+    - assets/logo/
 
 flutter_launcher_icons:
   android: true
   ios: true
   remove_alpha_ios: true
   image_path: "assets/icon/app_icon.png"
-
-# NOTE for store release: google_fonts downloads fonts at runtime during
-# development. Before shipping, bundle Cormorant Garamond + Outfit as
-# assets so the app renders correctly offline on first launch.

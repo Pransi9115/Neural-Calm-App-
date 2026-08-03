@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../theme/app_colors.dart';
+import '../widgets/calm_nav_bar.dart';
 import 'assessment/assessment_intro_screen.dart';
 import 'body_screen.dart';
 import 'chat_screen.dart';
@@ -15,8 +14,6 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> {
-  int _index = 0;
-
   static const _tabs = [
     HomeScreen(),
     AssessmentIntroScreen(),
@@ -27,27 +24,12 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(index: _index, children: _tabs),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _index,
-        onTap: (i) => setState(() => _index = i),
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: AppColors.navy,
-        selectedItemColor: Colors.white,
-        unselectedItemColor: AppColors.onNavy,
-        selectedFontSize: 11,
-        unselectedFontSize: 11,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(LucideIcons.house), label: 'Home'),
-          BottomNavigationBarItem(
-              icon: Icon(LucideIcons.clipboardList), label: 'Assess'),
-          BottomNavigationBarItem(
-              icon: Icon(LucideIcons.messageCircle), label: 'Marcus'),
-          BottomNavigationBarItem(
-              icon: Icon(LucideIcons.heartPulse), label: 'Body'),
-          BottomNavigationBarItem(icon: Icon(LucideIcons.user), label: 'Profile'),
-        ],
+    // Rebuilds whenever any screen changes calmTabIndex.
+    return ValueListenableBuilder<int>(
+      valueListenable: calmTabIndex,
+      builder: (context, index, _) => Scaffold(
+        body: IndexedStack(index: index, children: _tabs),
+        bottomNavigationBar: const CalmNavBar(),
       ),
     );
   }
