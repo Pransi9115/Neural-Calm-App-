@@ -1,6 +1,6 @@
+import 'dart:io' show Platform;
 import 'package:health/health.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 /// ─────────────────────────────────────────────────────────────
 /// DEVICE HEALTH DATA — Android Health Connect + Apple HealthKit
 /// via the `health` package.
@@ -101,17 +101,28 @@ class HealthService {
 
   /// True on Android when the Health Connect app itself is missing
   /// (Android 13 and older need it from the Play Store).
+ /// True only on Android, and only when the Health Connect app is
+  /// genuinely missing.
+  ///
+  /// Health Connect does not exist on iOS — HealthKit is part of the
+  /// OS there, so there is never anything to install. The platform
+  /// guard is what keeps the install prompt off iPhones: on iOS the
+  /// status call does not throw, it returns a value that is simply
+  /// not sdkAvailable, which would otherwise read as "needs install"
+  /// and show a button that can do nothing.
   Future<bool> healthConnectNeedsInstall() async {
+    if (!Platform.isAndroid) return false;
     try {
       await _configure();
       final status = await _health.getHealthConnectSdkStatus();
       return status != HealthConnectSdkStatus.sdkAvailable;
     } catch (_) {
-      return false; // iOS or check unsupported → nothing to install
+      return false;
     }
   }
 
   Future<void> openHealthConnectInstall() async {
+    if (!Platform.isAndroid) return;
     try {
       await _health.installHealthConnect();
     } catch (_) {}
