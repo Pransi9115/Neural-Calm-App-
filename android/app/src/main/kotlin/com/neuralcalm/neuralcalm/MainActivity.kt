@@ -1,4 +1,4 @@
-package com.neuralcalm.app
+package com.neuralcalm.neuralcalm
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 
