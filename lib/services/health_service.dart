@@ -34,6 +34,12 @@ class HealthSummary {
   final int? bpSys; // latest, last 7 days
   final int? bpDia;
 
+  /// When this snapshot was read from Apple Health / Health Connect.
+  /// Drives the "synced N min ago" line: these stores are not live
+  /// feeds, so a number with no timestamp can be hours old with
+  /// nothing on screen to say so.
+  final DateTime? fetchedAt;
+
   const HealthSummary({
     this.steps,
     this.sleepHours,
@@ -48,6 +54,7 @@ class HealthSummary {
     this.tempC,
     this.bpSys,
     this.bpDia,
+    this.fetchedAt,
   });
 
   bool get isEmpty =>
@@ -62,6 +69,25 @@ class HealthSummary {
       kcalTotal == null &&
       tempC == null &&
       bpSys == null;
+
+  /// Derived stress score, 0 (calm) to 100 (strained).
+  ///
+  /// No consumer band has a stress sensor. Every one that shows a
+  /// "stress level" computes it from heart-rate variability against
+  /// the wearer's own baseline, which is what this does. It is an
+  /// inference from HRV, not a measurement, and the UI must say so.
+  ///
+  /// Null until a baseline exists, which takes about a week of
+  /// readings — a stress number with nothing to compare against
+  /// would be meaningless.
+  int? get stressLevel {
+    final d = hrvDeltaPct;
+    if (d == null) return null;
+    // HRV well above baseline → calm; well below → strained.
+    // +20% maps to 0, -20% maps to 100, linear between.
+    final v = ((20 - d) / 40 * 100).clamp(0, 100);
+    return v.round();
+  }
 
   /// % change of recent HRV vs baseline (positive = above baseline).
   double? get hrvDeltaPct {
@@ -366,6 +392,7 @@ class HealthService {
       tempC: tempC,
       bpSys: bpSys,
       bpDia: bpDia,
+      fetchedAt: DateTime.now(),
     );
   }
 
