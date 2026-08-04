@@ -39,7 +39,6 @@ class _BodyScreenState extends State<BodyScreen>
   bool _connected = false;
   bool _needsInstall = false;
   HealthSummary _sum = const HealthSummary();
-  Map<String, int>? _probe;
 
   @override
   void initState() {
@@ -73,13 +72,10 @@ class _BodyScreenState extends State<BodyScreen>
     final connected = await _svc.isConnected();
     if (connected) {
       final s = await _svc.fetchSummary();
-      Map<String, int>? probe;
-      if (s.isEmpty) probe = await _svc.probe();
       if (!mounted) return;
       setState(() {
         _connected = true;
         _sum = s;
-        _probe = probe;
         _loading = false;
       });
       _startPolling();
@@ -118,13 +114,10 @@ class _BodyScreenState extends State<BodyScreen>
       }
     }
     final s = await _svc.fetchSummary();
-    Map<String, int>? probe;
-    if (s.isEmpty) probe = await _svc.probe();
     if (!mounted) return;
     setState(() {
       _connected = true;
       _sum = s;
-      _probe = probe;
       _loading = false;
     });
     _startPolling();
@@ -132,12 +125,9 @@ class _BodyScreenState extends State<BodyScreen>
 
   Future<void> _refresh() async {
     final s = await _svc.fetchSummary();
-    Map<String, int>? probe;
-    if (s.isEmpty) probe = await _svc.probe();
     if (!mounted) return;
     setState(() {
       _sum = s;
-      _probe = probe;
     });
   }
 
@@ -201,6 +191,7 @@ class _BodyScreenState extends State<BodyScreen>
     final s = _sum;
     final hrvDelta = s.hrvDeltaPct;
     final stress = s.stressLevel;
+    final wearable = _wearableSources;
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -209,13 +200,37 @@ class _BodyScreenState extends State<BodyScreen>
         _freshnessBar(),
         const SizedBox(height: 4),
 
-        // ── STEPS, with goal ring ───────────────────────────
-        _stepsCard(s.steps),
+        // ── ACTIVITY: steps, then the two numbers that belong with
+        //    it. Grouping them means the user reads one story
+        //    instead of hunting for calories further down.
+        _stepsCard(s.steps, s.stepSources),
+        _metricCard(
+          icon: LucideIcons.flame,
+          label: 'CALORIES TODAY',
+          value: s.kcalTotal != null
+              ? '${s.kcalTotal!.toStringAsFixed(0)} kcal'
+              : s.kcalActive != null
+                  ? '${s.kcalActive!.toStringAsFixed(0)} kcal'
+                  : '\u2014',
+          sub: s.kcalActive != null && s.kcalTotal != null
+              ? '${s.kcalActive!.toStringAsFixed(0)} kcal from activity'
+              : s.kcalActive != null
+                  ? 'Burned through activity'
+                  : 'Counted by your phone or band',
+        ),
+        _metricCard(
+          icon: LucideIcons.route,
+          label: 'DISTANCE TODAY',
+          value: s.distanceKm == null
+              ? '\u2014'
+              : '${s.distanceKm!.toStringAsFixed(2)} km',
+          sub: 'Counted by your phone or band',
+        ),
 
-        // ── Everything below is always shown, even with no
-        //    reading. A card that vanishes when empty makes the
-        //    app look broken; a card that says what it is waiting
-        //    for teaches the user what their band needs to send.
+        // ── BODY: everything that needs something on your wrist.
+        _sectionHeading(
+            wearable.isEmpty ? 'Needs a band or watch' : 'From your wearable'),
+
         _metricCard(
           icon: LucideIcons.heart,
           label: 'RESTING HEART RATE',
@@ -223,8 +238,8 @@ class _BodyScreenState extends State<BodyScreen>
               ? '\u2014'
               : '${s.restingHeartRate} bpm',
           sub: s.restingHeartRate == null
-              ? 'Needs a band or watch worn at rest'
-              : 'Most recent reading',
+              ? 'Wear your band for a few hours to see this'
+              : 'Your most recent reading',
         ),
         _metricCard(
           icon: LucideIcons.activity,
@@ -232,10 +247,10 @@ class _BodyScreenState extends State<BodyScreen>
           value:
               s.hrv7d == null ? '\u2014' : '${s.hrv7d!.toStringAsFixed(0)} ms',
           sub: hrvDelta == null
-              ? 'Baseline appears after ~a week of readings'
+              ? 'Your personal baseline builds over about a week'
               : hrvDelta >= 0
-                  ? '${hrvDelta.toStringAsFixed(0)}% above your baseline'
-                  : '${hrvDelta.abs().toStringAsFixed(0)}% below your baseline',
+                  ? '${hrvDelta.toStringAsFixed(0)}% above your usual'
+                  : '${hrvDelta.abs().toStringAsFixed(0)}% below your usual',
           subColor: hrvDelta == null
               ? null
               : hrvDelta >= -5
@@ -246,12 +261,12 @@ class _BodyScreenState extends State<BodyScreen>
           icon: LucideIcons.brain,
           label: 'STRESS LEVEL',
           value: stress == null ? '\u2014' : '$stress/100',
-          // Labelled as derived on purpose. No wrist device measures
-          // stress; this is inferred from HRV against the baseline,
-          // and presenting it as a reading would be a false claim.
+          // Says "worked out from" on purpose. No wrist device
+          // measures stress; it is inferred from HRV, and calling it
+          // a reading would be a claim the hardware cannot support.
           sub: stress == null
-              ? 'Calculated from HRV once a baseline exists'
-              : 'Derived from HRV, not a direct measurement',
+              ? 'Worked out from your HRV once a baseline exists'
+              : 'Worked out from your HRV, not measured directly',
           subColor: stress == null
               ? null
               : stress <= 40
@@ -267,25 +282,26 @@ class _BodyScreenState extends State<BodyScreen>
               ? '\u2014'
               : '${s.sleepHours!.toStringAsFixed(1)} h',
           sub: s.deepPct7d == null
-              ? 'Wear your band overnight to track sleep stages'
-              : 'Deep sleep ${s.deepPct7d!.toStringAsFixed(0)}% (7-day avg)',
+              ? 'Wear your band to bed to track your sleep'
+              : 'Deep sleep ${s.deepPct7d!.toStringAsFixed(0)}% this week',
         ),
         _metricCard(
           icon: LucideIcons.droplets,
           label: 'BLOOD OXYGEN (SPO2)',
           value: s.spo2 == null ? '\u2014' : '${s.spo2!.toStringAsFixed(0)}%',
           sub: s.spo2 == null
-              ? 'Appears once your band syncs SpO2 readings'
-              : 'Latest reading',
+              ? 'Shows up if your band measures oxygen'
+              : 'Your most recent reading',
         ),
         _metricCard(
           icon: LucideIcons.thermometer,
           label: 'BODY TEMPERATURE',
-          value:
-              s.tempC == null ? '\u2014' : '${s.tempC!.toStringAsFixed(1)} \u00B0C',
+          value: s.tempC == null
+              ? '\u2014'
+              : '${s.tempC!.toStringAsFixed(1)} \u00B0C',
           sub: s.tempC == null
-              ? 'Appears once your band syncs skin temperature'
-              : 'Latest reading',
+              ? 'Shows up if your band measures temperature'
+              : 'Your most recent reading',
         ),
         _metricCard(
           icon: LucideIcons.gauge,
@@ -294,66 +310,14 @@ class _BodyScreenState extends State<BodyScreen>
               ? '\u2014'
               : '${s.bpSys}/${s.bpDia}',
           sub: (s.bpSys == null || s.bpDia == null)
-              ? 'Needs a cuff or band that records blood pressure'
-              : 'Latest reading (mmHg)',
-        ),
-        _metricCard(
-          icon: LucideIcons.flame,
-          label: 'CALORIES TODAY',
-          value: s.kcalTotal != null
-              ? '${s.kcalTotal!.toStringAsFixed(0)} kcal'
-              : s.kcalActive != null
-                  ? '${s.kcalActive!.toStringAsFixed(0)} kcal'
-                  : '\u2014',
-          sub: s.kcalActive != null && s.kcalTotal != null
-              ? '${s.kcalActive!.toStringAsFixed(0)} kcal active'
-              : s.kcalActive != null
-                  ? 'Active burn'
-                  : 'From your phone or band',
-        ),
-        _metricCard(
-          icon: LucideIcons.route,
-          label: 'DISTANCE TODAY',
-          value: s.distanceKm == null
-              ? '\u2014'
-              : '${s.distanceKm!.toStringAsFixed(2)} km',
-          sub: s.distanceKm == null ? 'From your phone or band' : null,
+              ? 'Needs a blood pressure cuff or a band that measures it'
+              : 'Your most recent reading (mmHg)',
         ),
 
-        // ── Diagnostics, only when nothing came back at all ──
-        if (s.isEmpty) ...[
+        // ── Help, shown only while the wrist metrics are empty ──
+        if (wearable.isEmpty) ...[
           const SizedBox(height: 6),
-          _card(
-            icon: LucideIcons.info,
-            title: 'Connected \u2014 waiting for data',
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Permission is fine, but no readings have arrived yet. '
-                    'Your phone alone can only count steps \u2014 heart rate, '
-                    'HRV and sleep need a band or watch. Open your band\'s '
-                    'own app, switch on syncing to Health, then pull down '
-                    'to refresh here.',
-                    style: TextStyle(
-                        fontSize: 12.5, color: AppColors.muted, height: 1.5),
-                  ),
-                  if (_probe != null) ...[
-                    const SizedBox(height: 8),
-                    Text('RECORDS FOUND (LAST 7 DAYS)', style: secLabel()),
-                    const SizedBox(height: 4),
-                    Text(
-                      _probe!.entries
-                          .map((e) => '${e.key}: ${e.value}')
-                          .join(' \u00B7 '),
-                      style: const TextStyle(
-                          fontSize: 10.5,
-                          color: AppColors.muted,
-                          height: 1.6),
-                    ),
-                  ],
-                ]),
-          ),
+          _bandHelpCard(),
         ],
 
         const SizedBox(height: 6),
@@ -361,8 +325,8 @@ class _BodyScreenState extends State<BodyScreen>
           icon: LucideIcons.clipboardCheck,
           title: 'Used in your assessment',
           child: const Text(
-            'When you take an assessment, the Biometric Data answer for '
-            'HRV trend is filled in automatically from this data.',
+            'When you take an assessment, your HRV trend is filled in '
+            'for you from this data.',
             style: TextStyle(
                 fontSize: 12.5, color: AppColors.muted, height: 1.5),
           ),
@@ -371,6 +335,82 @@ class _BodyScreenState extends State<BodyScreen>
       ],
     );
   }
+
+  /// Sources other than the phone itself. If this is empty, nothing
+  /// on the wrist is reaching Health, which is the single most
+  /// useful thing to tell the user.
+  Set<String> get _wearableSources => _sum.allSources
+      .where((n) {
+        final l = n.toLowerCase();
+        return !l.contains('iphone') &&
+            !l.contains('phone') &&
+            !l.contains('clock') &&
+            !l.contains('health');
+      })
+      .toSet();
+
+  Widget _sectionHeading(String text) => Padding(
+        padding: const EdgeInsets.fromLTRB(3, 10, 3, 9),
+        child: Text(text.toUpperCase(), style: secLabel()),
+      );
+
+  /// Plain-language help for the commonest situation by far: the
+  /// band is on the wrist but its own app is not passing anything on.
+  Widget _bandHelpCard() {
+    return _card(
+      icon: LucideIcons.info,
+      title: 'Not seeing your band yet?',
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(
+          'Your phone can count steps on its own, but heart rate, '
+          'sleep and HRV have to come from something on your wrist.',
+          style: const TextStyle(
+              fontSize: 12.5, color: AppColors.muted, height: 1.5),
+        ),
+        const SizedBox(height: 10),
+        _step(1, 'Open the app that came with your band and let it sync.'),
+        _step(2,
+            'In that app, turn on sharing with ${_sourceName.split(' ').first} Health.'),
+        _step(3,
+            'Open the Health app and check your heart rate is showing there.'),
+        _step(4, 'Come back here and pull down to refresh.'),
+        if (_sum.allSources.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Text('SHARING WITH HEALTH RIGHT NOW', style: secLabel()),
+          const SizedBox(height: 4),
+          Text(
+            _sum.allSources.join(' \u00B7 '),
+            style: const TextStyle(
+                fontSize: 11.5, color: AppColors.muted, height: 1.5),
+          ),
+        ],
+      ]),
+    );
+  }
+
+  Widget _step(int n, String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 7),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            width: 18,
+            height: 18,
+            alignment: Alignment.center,
+            margin: const EdgeInsets.only(top: 1, right: 9),
+            decoration: const BoxDecoration(
+                color: AppColors.purplePale, shape: BoxShape.circle),
+            child: Text('$n',
+                style: const TextStyle(
+                    fontSize: 10.5,
+                    color: AppColors.purple,
+                    fontWeight: FontWeight.w700)),
+          ),
+          Expanded(
+            child: Text(text,
+                style: const TextStyle(
+                    fontSize: 12.5, color: AppColors.ink, height: 1.45)),
+          ),
+        ]),
+      );
 
   // ── Freshness ────────────────────────────────────────────────
   /// Apple Health and Health Connect are stores, not live feeds: a
@@ -407,7 +447,7 @@ class _BodyScreenState extends State<BodyScreen>
   }
 
   // ── Steps, with goal ─────────────────────────────────────────
-  Widget _stepsCard(int? steps) {
+  Widget _stepsCard(int? steps, Set<String> sources) {
     final v = steps ?? 0;
     final pct = (v / _stepGoal).clamp(0.0, 1.0);
     return Container(
@@ -460,10 +500,27 @@ class _BodyScreenState extends State<BodyScreen>
           ),
         ),
         const SizedBox(height: 7),
-        Text(
-          '${(pct * 100).toStringAsFixed(0)}% of $_stepGoal steps goal',
-          style: const TextStyle(fontSize: 11.5, color: AppColors.muted),
-        ),
+        Row(children: [
+          Expanded(
+            child: Text(
+              '${(pct * 100).toStringAsFixed(0)}% of $_stepGoal steps goal',
+              style: const TextStyle(fontSize: 11.5, color: AppColors.muted),
+            ),
+          ),
+          // Naming the counter matters: a phone in a pocket and a
+          // band on a wrist will never show the same number, and
+          // without this the difference looks like a bug.
+          if (sources.isNotEmpty)
+            Flexible(
+              child: Text(
+                'Counted by ${sources.join(', ')}',
+                textAlign: TextAlign.right,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontSize: 10.5, color: AppColors.muted),
+              ),
+            ),
+        ]),
       ]),
     );
   }

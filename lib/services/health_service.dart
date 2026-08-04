@@ -34,6 +34,17 @@ class HealthSummary {
   final int? bpSys; // latest, last 7 days
   final int? bpDia;
 
+  /// Which apps or devices wrote today's steps, e.g. {iPhone, H Band}.
+  /// Both a phone and a band can log steps into the same store, and
+  /// they will not agree — the phone counts only while carried, the
+  /// band only while worn. Naming the source is the difference
+  /// between a number the user can explain and one that looks wrong.
+  final Set<String> stepSources;
+
+  /// Every app or device that has written anything we read. Used by
+  /// the empty state to say whether a band is connected at all.
+  final Set<String> allSources;
+
   /// When this snapshot was read from Apple Health / Health Connect.
   /// Drives the "synced N min ago" line: these stores are not live
   /// feeds, so a number with no timestamp can be hours old with
@@ -55,6 +66,8 @@ class HealthSummary {
     this.bpSys,
     this.bpDia,
     this.fetchedAt,
+    this.stepSources = const {},
+    this.allSources = const {},
   });
 
   bool get isEmpty =>
@@ -223,12 +236,22 @@ class HealthService {
     await _configure();
     final now = DateTime.now();
 
+    final sources = <String>{};
+    final stepSrc = <String>{};
+
     // Steps today
     int? steps;
     try {
       steps = await _health.getTotalStepsInInterval(
           DateTime(now.year, now.month, now.day), now);
     } catch (_) {}
+    // Read the raw step records too, purely to learn which device
+    // wrote them. getTotalStepsInInterval returns a bare number.
+    final stepPoints = await _fetch([HealthDataType.STEPS],
+        DateTime(now.year, now.month, now.day), now);
+    for (final p in stepPoints) {
+      if (p.sourceName.isNotEmpty) stepSrc.add(p.sourceName);
+    }
 
     // Sleep — last night (18:00 yesterday → now)
     double? sleepHours;
@@ -241,6 +264,9 @@ class HealthService {
       HealthDataType.SLEEP_LIGHT,
       HealthDataType.SLEEP_REM,
     ], nightFrom, now);
+    for (final p in night) {
+      if (p.sourceName.isNotEmpty) sources.add(p.sourceName);
+    }
     if (night.isNotEmpty) {
       final sessions =
           night.where((p) => p.type == HealthDataType.SLEEP_SESSION);
@@ -274,6 +300,9 @@ class HealthService {
       HealthDataType.SLEEP_REM,
       HealthDataType.SLEEP_ASLEEP,
     ], now.subtract(const Duration(days: 7)), now);
+    for (final p in week) {
+      if (p.sourceName.isNotEmpty) sources.add(p.sourceName);
+    }
     if (week.isNotEmpty) {
       int deepMin = 0, totalMin = 0;
       for (final p in week) {
@@ -288,6 +317,9 @@ class HealthService {
     int? restingHr;
     final rhr = await _fetch([HealthDataType.RESTING_HEART_RATE],
         now.subtract(const Duration(days: 7)), now);
+    for (final p in rhr) {
+      if (p.sourceName.isNotEmpty) sources.add(p.sourceName);
+    }
     if (rhr.isNotEmpty) {
       rhr.sort((a, b) => a.dateTo.compareTo(b.dateTo));
       restingHr = _num(rhr.last).round();
@@ -299,6 +331,9 @@ class HealthService {
         [HealthDataType.HEART_RATE_VARIABILITY_RMSSD],
         now.subtract(const Duration(days: 7)),
         now);
+    for (final p in hrvRecent) {
+      if (p.sourceName.isNotEmpty) sources.add(p.sourceName);
+    }
     if (hrvRecent.isNotEmpty) {
       hrv7 = hrvRecent.map(_num).reduce((a, b) => a + b) / hrvRecent.length;
     }
@@ -327,6 +362,9 @@ class HealthService {
     double? spo2;
     final ox = await _fetch([HealthDataType.BLOOD_OXYGEN],
         now.subtract(const Duration(days: 7)), now);
+    for (final p in ox) {
+      if (p.sourceName.isNotEmpty) sources.add(p.sourceName);
+    }
     if (ox.isNotEmpty) {
       ox.sort((a, b) => a.dateTo.compareTo(b.dateTo));
       spo2 = _num(ox.last);
@@ -337,6 +375,9 @@ class HealthService {
     double? distanceKm;
     final dist =
         await _fetch([HealthDataType.DISTANCE_DELTA], dayStart, now);
+    for (final p in dist) {
+      if (p.sourceName.isNotEmpty) sources.add(p.sourceName);
+    }
     if (dist.isNotEmpty) {
       distanceKm = dist.map(_num).reduce((a, b) => a + b) / 1000.0;
     }
@@ -345,11 +386,17 @@ class HealthService {
     double? kcalActive, kcalTotal;
     final act =
         await _fetch([HealthDataType.ACTIVE_ENERGY_BURNED], dayStart, now);
+    for (final p in act) {
+      if (p.sourceName.isNotEmpty) sources.add(p.sourceName);
+    }
     if (act.isNotEmpty) {
       kcalActive = act.map(_num).reduce((a, b) => a + b);
     }
     final tot =
         await _fetch([HealthDataType.TOTAL_CALORIES_BURNED], dayStart, now);
+    for (final p in tot) {
+      if (p.sourceName.isNotEmpty) sources.add(p.sourceName);
+    }
     if (tot.isNotEmpty) {
       kcalTotal = tot.map(_num).reduce((a, b) => a + b);
     }
@@ -358,6 +405,9 @@ class HealthService {
     double? tempC;
     final temp = await _fetch([HealthDataType.BODY_TEMPERATURE],
         now.subtract(const Duration(days: 7)), now);
+    for (final p in temp) {
+      if (p.sourceName.isNotEmpty) sources.add(p.sourceName);
+    }
     if (temp.isNotEmpty) {
       temp.sort((a, b) => a.dateTo.compareTo(b.dateTo));
       tempC = _num(temp.last);
@@ -367,12 +417,18 @@ class HealthService {
     int? bpSys, bpDia;
     final sys = await _fetch([HealthDataType.BLOOD_PRESSURE_SYSTOLIC],
         now.subtract(const Duration(days: 7)), now);
+    for (final p in sys) {
+      if (p.sourceName.isNotEmpty) sources.add(p.sourceName);
+    }
     if (sys.isNotEmpty) {
       sys.sort((a, b) => a.dateTo.compareTo(b.dateTo));
       bpSys = _num(sys.last).round();
     }
     final dia = await _fetch([HealthDataType.BLOOD_PRESSURE_DIASTOLIC],
         now.subtract(const Duration(days: 7)), now);
+    for (final p in dia) {
+      if (p.sourceName.isNotEmpty) sources.add(p.sourceName);
+    }
     if (dia.isNotEmpty) {
       dia.sort((a, b) => a.dateTo.compareTo(b.dateTo));
       bpDia = _num(dia.last).round();
@@ -393,6 +449,8 @@ class HealthService {
       bpSys: bpSys,
       bpDia: bpDia,
       fetchedAt: DateTime.now(),
+      stepSources: stepSrc,
+      allSources: sources..addAll(stepSrc),
     );
   }
 
