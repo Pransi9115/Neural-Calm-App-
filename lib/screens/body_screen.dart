@@ -204,7 +204,10 @@ class _BodyScreenState extends State<BodyScreen>
 
         // Calories and distance are both "how much did I move today",
         // so they read better as a pair than stacked full width.
-        Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        IntrinsicHeight(
+          child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
           Expanded(
             child: _miniCard(
               icon: LucideIcons.flame,
@@ -228,7 +231,7 @@ class _BodyScreenState extends State<BodyScreen>
               unit: 'km',
             ),
           ),
-        ]),
+        ])),
 
         // One heading carries the "you need a wearable" message, so
         // the cards underneath do not each repeat it.
