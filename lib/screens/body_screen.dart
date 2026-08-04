@@ -191,7 +191,7 @@ class _BodyScreenState extends State<BodyScreen>
     final s = _sum;
     final hrvDelta = s.hrvDeltaPct;
     final stress = s.stressLevel;
-    final wearable = _wearableSources;
+    final worn = _wearableSources.isNotEmpty;
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -200,36 +200,39 @@ class _BodyScreenState extends State<BodyScreen>
         _freshnessBar(),
         const SizedBox(height: 4),
 
-        // ── ACTIVITY: steps, then the two numbers that belong with
-        //    it. Grouping them means the user reads one story
-        //    instead of hunting for calories further down.
-        _stepsCard(s.steps, s.stepSources),
-        _metricCard(
-          icon: LucideIcons.flame,
-          label: 'CALORIES TODAY',
-          value: s.kcalTotal != null
-              ? '${s.kcalTotal!.toStringAsFixed(0)} kcal'
-              : s.kcalActive != null
-                  ? '${s.kcalActive!.toStringAsFixed(0)} kcal'
-                  : '\u2014',
-          sub: s.kcalActive != null && s.kcalTotal != null
-              ? '${s.kcalActive!.toStringAsFixed(0)} kcal from activity'
-              : s.kcalActive != null
-                  ? 'Burned through activity'
-                  : 'Counted by your phone or band',
-        ),
-        _metricCard(
-          icon: LucideIcons.route,
-          label: 'DISTANCE TODAY',
-          value: s.distanceKm == null
-              ? '\u2014'
-              : '${s.distanceKm!.toStringAsFixed(2)} km',
-          sub: 'Counted by your phone or band',
-        ),
+        _stepsCard(s),
 
-        // ── BODY: everything that needs something on your wrist.
-        _sectionHeading(
-            wearable.isEmpty ? 'Needs a band or watch' : 'From your wearable'),
+        // Calories and distance are both "how much did I move today",
+        // so they read better as a pair than stacked full width.
+        Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Expanded(
+            child: _miniCard(
+              icon: LucideIcons.flame,
+              label: 'CALORIES',
+              value: s.kcalTotal != null
+                  ? s.kcalTotal!.toStringAsFixed(0)
+                  : s.kcalActive != null
+                      ? s.kcalActive!.toStringAsFixed(0)
+                      : '\u2014',
+              unit: 'kcal',
+            ),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: _miniCard(
+              icon: LucideIcons.route,
+              label: 'DISTANCE',
+              value: s.distanceKm == null
+                  ? '\u2014'
+                  : s.distanceKm!.toStringAsFixed(2),
+              unit: 'km',
+            ),
+          ),
+        ]),
+
+        // One heading carries the "you need a wearable" message, so
+        // the cards underneath do not each repeat it.
+        _sectionHeading(worn ? 'From your wearable' : 'Needs a band or watch'),
 
         _metricCard(
           icon: LucideIcons.heart,
@@ -237,9 +240,23 @@ class _BodyScreenState extends State<BodyScreen>
           value: s.restingHeartRate == null
               ? '\u2014'
               : '${s.restingHeartRate} bpm',
-          sub: s.restingHeartRate == null
-              ? 'Wear your band for a few hours to see this'
-              : 'Your most recent reading',
+          sub: s.restingHeartRate == null ? null : 'Your most recent reading',
+        ),
+        _metricCard(
+          icon: LucideIcons.gauge,
+          label: 'BLOOD PRESSURE',
+          value: (s.bpSys == null || s.bpDia == null)
+              ? '\u2014'
+              : '${s.bpSys}/${s.bpDia}',
+          sub: (s.bpSys == null || s.bpDia == null) ? null : 'mmHg',
+        ),
+        _metricCard(
+          icon: LucideIcons.thermometer,
+          label: 'BODY TEMPERATURE',
+          value: s.tempC == null
+              ? '\u2014'
+              : '${s.tempC!.toStringAsFixed(1)} \u00B0C',
+          sub: s.tempC == null ? null : 'Your most recent reading',
         ),
         _metricCard(
           icon: LucideIcons.activity,
@@ -247,7 +264,7 @@ class _BodyScreenState extends State<BodyScreen>
           value:
               s.hrv7d == null ? '\u2014' : '${s.hrv7d!.toStringAsFixed(0)} ms',
           sub: hrvDelta == null
-              ? 'Your personal baseline builds over about a week'
+              ? null
               : hrvDelta >= 0
                   ? '${hrvDelta.toStringAsFixed(0)}% above your usual'
                   : '${hrvDelta.abs().toStringAsFixed(0)}% below your usual',
@@ -261,12 +278,10 @@ class _BodyScreenState extends State<BodyScreen>
           icon: LucideIcons.brain,
           label: 'STRESS LEVEL',
           value: stress == null ? '\u2014' : '$stress/100',
-          // Says "worked out from" on purpose. No wrist device
-          // measures stress; it is inferred from HRV, and calling it
-          // a reading would be a claim the hardware cannot support.
-          sub: stress == null
-              ? 'Worked out from your HRV once a baseline exists'
-              : 'Worked out from your HRV, not measured directly',
+          // Kept even when populated: no wrist device measures
+          // stress, it is inferred from HRV, and dropping the caveat
+          // would present an inference as a reading.
+          sub: stress == null ? null : 'Worked out from your HRV',
           subColor: stress == null
               ? null
               : stress <= 40
@@ -282,40 +297,17 @@ class _BodyScreenState extends State<BodyScreen>
               ? '\u2014'
               : '${s.sleepHours!.toStringAsFixed(1)} h',
           sub: s.deepPct7d == null
-              ? 'Wear your band to bed to track your sleep'
+              ? null
               : 'Deep sleep ${s.deepPct7d!.toStringAsFixed(0)}% this week',
         ),
         _metricCard(
           icon: LucideIcons.droplets,
           label: 'BLOOD OXYGEN (SPO2)',
           value: s.spo2 == null ? '\u2014' : '${s.spo2!.toStringAsFixed(0)}%',
-          sub: s.spo2 == null
-              ? 'Shows up if your band measures oxygen'
-              : 'Your most recent reading',
-        ),
-        _metricCard(
-          icon: LucideIcons.thermometer,
-          label: 'BODY TEMPERATURE',
-          value: s.tempC == null
-              ? '\u2014'
-              : '${s.tempC!.toStringAsFixed(1)} \u00B0C',
-          sub: s.tempC == null
-              ? 'Shows up if your band measures temperature'
-              : 'Your most recent reading',
-        ),
-        _metricCard(
-          icon: LucideIcons.gauge,
-          label: 'BLOOD PRESSURE',
-          value: (s.bpSys == null || s.bpDia == null)
-              ? '\u2014'
-              : '${s.bpSys}/${s.bpDia}',
-          sub: (s.bpSys == null || s.bpDia == null)
-              ? 'Needs a blood pressure cuff or a band that measures it'
-              : 'Your most recent reading (mmHg)',
+          sub: s.spo2 == null ? null : 'Your most recent reading',
         ),
 
-        // ── Help, shown only while the wrist metrics are empty ──
-        if (wearable.isEmpty) ...[
+        if (!worn) ...[
           const SizedBox(height: 6),
           _bandHelpCard(),
         ],
@@ -333,6 +325,53 @@ class _BodyScreenState extends State<BodyScreen>
         ),
         const SizedBox(height: 20),
       ],
+    );
+  }
+
+  /// Half-width card for the pair under steps.
+  Widget _miniCard({
+    required IconData icon,
+    required String label,
+    required String value,
+    required String unit,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 11),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppColors.cardShadow,
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            width: 30,
+            height: 30,
+            decoration: const BoxDecoration(
+                color: AppColors.purplePale, shape: BoxShape.circle),
+            child: Icon(icon, size: 15, color: AppColors.purple),
+          ),
+          const SizedBox(width: 9),
+          Expanded(child: Text(label, style: secLabel())),
+        ]),
+        const SizedBox(height: 10),
+        Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Flexible(
+                child: Text(value,
+                    overflow: TextOverflow.ellipsis,
+                    style: cormorant(size: 23)),
+              ),
+              const SizedBox(width: 4),
+              Text(unit,
+                  style: const TextStyle(
+                      fontSize: 11.5, color: AppColors.muted)),
+            ]),
+      ]),
     );
   }
 
@@ -446,10 +485,24 @@ class _BodyScreenState extends State<BodyScreen>
     return 'updated ${d.inDays} d ago';
   }
 
-  // ── Steps, with goal ─────────────────────────────────────────
-  Widget _stepsCard(int? steps, Set<String> sources) {
+  // ── Steps, with goal and a per-device split ──────────────────
+  /// A phone counts only while carried, a band only while worn, so
+  /// the two never match. Showing the split turns a confusing
+  /// discrepancy into an explanation.
+  Widget _stepsCard(HealthSummary s) {
+    final steps = s.steps;
     final v = steps ?? 0;
     final pct = (v / _stepGoal).clamp(0.0, 1.0);
+
+    final phoneName = s.stepSources.firstWhere(
+        (n) => n.toLowerCase().contains('phone'),
+        orElse: () => 'Phone');
+    final wornName = s.stepSources.firstWhere(
+        (n) => !n.toLowerCase().contains('phone') &&
+            !n.toLowerCase().contains('clock') &&
+            !n.toLowerCase().contains('health'),
+        orElse: () => 'Band or watch');
+
     return Container(
       margin: const EdgeInsets.only(bottom: 11),
       padding: const EdgeInsets.all(15),
@@ -476,7 +529,8 @@ class _BodyScreenState extends State<BodyScreen>
                 children: [
                   Text('STEPS TODAY', style: secLabel()),
                   const SizedBox(height: 3),
-                  Row(crossAxisAlignment: CrossAxisAlignment.baseline,
+                  Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
                       textBaseline: TextBaseline.alphabetic,
                       children: [
                         Text(steps?.toString() ?? '\u2014',
@@ -500,29 +554,51 @@ class _BodyScreenState extends State<BodyScreen>
           ),
         ),
         const SizedBox(height: 7),
+        Text('${(pct * 100).toStringAsFixed(0)}% of $_stepGoal steps goal',
+            style: const TextStyle(fontSize: 11.5, color: AppColors.muted)),
+        const SizedBox(height: 13),
+        const Divider(height: 1, color: AppColors.border),
+        const SizedBox(height: 11),
         Row(children: [
           Expanded(
-            child: Text(
-              '${(pct * 100).toStringAsFixed(0)}% of $_stepGoal steps goal',
-              style: const TextStyle(fontSize: 11.5, color: AppColors.muted),
-            ),
+            child: _stepSplit(
+                phoneName, s.stepsPhone, LucideIcons.smartphone),
           ),
-          // Naming the counter matters: a phone in a pocket and a
-          // band on a wrist will never show the same number, and
-          // without this the difference looks like a bug.
-          if (sources.isNotEmpty)
-            Flexible(
-              child: Text(
-                'Counted by ${sources.join(', ')}',
-                textAlign: TextAlign.right,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    fontSize: 10.5, color: AppColors.muted),
-              ),
-            ),
+          Container(
+              width: 1,
+              height: 32,
+              color: AppColors.border,
+              margin: const EdgeInsets.symmetric(horizontal: 12)),
+          Expanded(
+            child: _stepSplit(wornName, s.stepsWearable, LucideIcons.watch),
+          ),
         ]),
       ]),
     );
+  }
+
+  Widget _stepSplit(String name, int? value, IconData icon) {
+    final has = value != null;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Icon(icon,
+            size: 12,
+            color: has ? AppColors.purple : AppColors.muted),
+        const SizedBox(width: 5),
+        Expanded(
+          child: Text(name,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 10.5, color: AppColors.muted)),
+        ),
+      ]),
+      const SizedBox(height: 4),
+      Text(has ? value.toString() : '\u2014',
+          style: TextStyle(
+              fontSize: 17,
+              height: 1.1,
+              color: has ? AppColors.ink : AppColors.muted,
+              fontWeight: FontWeight.w600)),
+    ]);
   }
 
   Widget _metricCard({

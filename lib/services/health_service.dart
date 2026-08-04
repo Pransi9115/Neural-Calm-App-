@@ -34,6 +34,12 @@ class HealthSummary {
   final int? bpSys; // latest, last 7 days
   final int? bpDia;
 
+  /// Today's steps as counted by the phone itself.
+  final int? stepsPhone;
+
+  /// Today's steps as counted by a band or watch.
+  final int? stepsWearable;
+
   /// Which apps or devices wrote today's steps, e.g. {iPhone, H Band}.
   /// Both a phone and a band can log steps into the same store, and
   /// they will not agree — the phone counts only while carried, the
@@ -68,6 +74,8 @@ class HealthSummary {
     this.fetchedAt,
     this.stepSources = const {},
     this.allSources = const {},
+    this.stepsPhone,
+    this.stepsWearable,
   });
 
   bool get isEmpty =>
@@ -113,7 +121,7 @@ class HealthService {
   static const _prefKey = 'nc2_health_connected';
   final Health _health = Health();
 
-  static const _types = <HealthDataType>[
+  static final _types = <HealthDataType>[
     HealthDataType.STEPS,
     HealthDataType.SLEEP_SESSION,
     HealthDataType.SLEEP_DEEP,
@@ -124,7 +132,12 @@ class HealthService {
     HealthDataType.RESTING_HEART_RATE,
     HealthDataType.HEART_RATE_VARIABILITY_RMSSD,
     HealthDataType.BLOOD_OXYGEN,
-    HealthDataType.DISTANCE_DELTA,
+    // Distance is named differently per platform. Requesting only
+    // the Android name is why iOS showed a blank distance card.
+    if (Platform.isAndroid)
+      HealthDataType.DISTANCE_DELTA
+    else
+      HealthDataType.DISTANCE_WALKING_RUNNING,
     HealthDataType.ACTIVE_ENERGY_BURNED,
     HealthDataType.TOTAL_CALORIES_BURNED,
     HealthDataType.BODY_TEMPERATURE,
@@ -249,8 +262,22 @@ class HealthService {
     // wrote them. getTotalStepsInInterval returns a bare number.
     final stepPoints = await _fetch([HealthDataType.STEPS],
         DateTime(now.year, now.month, now.day), now);
+    // Split by who counted them. A phone in a pocket and a band on
+    // a wrist never agree, and one merged figure hides that.
+    double phoneSteps = 0, wornSteps = 0;
     for (final p in stepPoints) {
-      if (p.sourceName.isNotEmpty) stepSrc.add(p.sourceName);
+      final name = p.sourceName;
+      if (name.isNotEmpty) stepSrc.add(name);
+      final l = name.toLowerCase();
+      final isPhone = l.contains('iphone') ||
+          l.contains('phone') ||
+          l.contains('clock') ||
+          l.contains('health');
+      if (isPhone) {
+        phoneSteps += _num(p);
+      } else {
+        wornSteps += _num(p);
+      }
     }
 
     // Sleep — last night (18:00 yesterday → now)
@@ -373,8 +400,11 @@ class HealthService {
 
     // Distance today (metres → km)
     double? distanceKm;
-    final dist =
-        await _fetch([HealthDataType.DISTANCE_DELTA], dayStart, now);
+    final dist = await _fetch([
+      Platform.isAndroid
+          ? HealthDataType.DISTANCE_DELTA
+          : HealthDataType.DISTANCE_WALKING_RUNNING
+    ], dayStart, now);
     for (final p in dist) {
       if (p.sourceName.isNotEmpty) sources.add(p.sourceName);
     }
@@ -451,6 +481,8 @@ class HealthService {
       fetchedAt: DateTime.now(),
       stepSources: stepSrc,
       allSources: sources..addAll(stepSrc),
+      stepsPhone: phoneSteps > 0 ? phoneSteps.round() : null,
+      stepsWearable: wornSteps > 0 ? wornSteps.round() : null,
     );
   }
 
